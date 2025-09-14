@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EmojiQ</title>
+  <script type="module" src="/main.js" defer></script>
+</head>
+
+<body>
+  <main class="container">
+    <div data-tauri-drag-region class="search-container">
+      <input type="text" id="searchInput" class="search-input" placeholder="Search emojis..." autocomplete="off" />
+    </div>
+
+    <div class="emoji-grid" id="emojiGrid">
+      <!-- Emojis will be populated by JavaScript -->
+    </div>
+
+    <div data-tauri-drag-region class="status-bar" id="statusBar">
+      <!-- Status bar will be populated by JavaScript -->
+    </div>
+  </main>
+</body>
+
+</html>

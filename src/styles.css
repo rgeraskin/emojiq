@@ -1,0 +1,157 @@
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+html {
+  box-sizing: border-box;
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+body {
+  color: #333;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  user-select: none;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Search Container */
+.search-container {
+  flex: 0 0 auto;
+  padding: 10px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+  border-radius: 12px 12px 0 0;
+}
+
+.search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  font-size: 14px;
+  outline: none;
+  background: #fff;
+}
+
+.search-input:focus {
+  border-color: #007AFF;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+/* Emoji Grid */
+.emoji-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-auto-rows: min-content;
+  gap: 0px;
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.emoji-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.emoji-button:hover {
+  background: #f0f0f0;
+  transform: scale(1.1);
+}
+
+.emoji-button:active {
+  background: #e0e0e0;
+  transform: scale(0.95);
+}
+
+/* Status Bar */
+#statusBar {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  font-size: 16px;
+  color: #666;
+  line-height: 16px;
+  border-radius: 0 0 12px 12px;
+  line-height: 16px;
+}
+
+.status-bar-message {
+  text-align: center;
+  height: 32px;
+}
+
+.status-bar-keywords {
+  text-align: left;
+  min-height: 32px;
+  max-lines: 3;
+  white-space: pre-wrap;
+  /* overflow: hidden;
+  text-overflow: ellipsis; */
+  /* Change from nowrap to pre-wrap to preserve newlines */
+}
+
+/* Scrollbar styling */
+.emoji-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.emoji-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.emoji-grid::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.emoji-grid::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.no-results {
+  text-align: center;
+  color: #999;
+  padding: 20px;
+  grid-column: 1 / -1;
+}
