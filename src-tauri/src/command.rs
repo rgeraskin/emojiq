@@ -68,7 +68,7 @@ pub async fn type_emoji(_: AppHandle, emoji: String) -> Result<(), String> {
         println!("accessibility permission already granted");
     }
 
-    thread::sleep(Duration::from_millis(200));
+    thread::sleep(Duration::from_millis(100));
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
 
     // write text

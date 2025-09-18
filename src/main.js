@@ -242,9 +242,9 @@ async function selectEmoji(emoji) {
     // await window.wails.App.SelectEmoji(emoji.Character);
     // await window.wails.App.CopyEmojiToClipboard(emoji.Character);
 
-    await python("increment_usage", [emoji]);
     await invoke("hide_panel");
     await invoke("type_emoji", { emoji: emoji });
+    await python("increment_usage", [emoji]);
     await renderPanel();
 
     // updateStatus(`Copied ${emoji} to clipboard! Press Cmd+V to paste.`);
