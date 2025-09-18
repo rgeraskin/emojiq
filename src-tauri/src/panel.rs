@@ -41,18 +41,12 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     panel.set_corner_radius(12.0); // without it - panel edges are not rounded, only window edges are rounded
 
     // panel.set_transparent(true); // works without it
-    // panel.set_works_when_modal(true); // hz?
-    // panel.set_level(PanelLevel::Floating.into()); // hz?
+    // panel.set_works_when_modal(true); // why?
+    // panel.set_level(PanelLevel::Floating.into()); // why?
     // panel.set_movable_by_window_background(true); // not working
 
     // Ensures the panel cannot activate the App
-    // panel.set_style_mask(NSWindowStyleMaskNonActivatingPanel); // should be adapted but hz why?
-
-    // Print panel info
-    println!("Panel class name: {:?}", panel.as_panel().class().name());
-    println!("Panel can become key?: {}", panel.can_become_key_window());
-    println!("Panel can become main?: {}", panel.can_become_main_window());
-    println!("Panel is floating?: {}", panel.is_floating_panel());
+    // panel.set_style_mask(NSWindowStyleMaskNonActivatingPanel); // should be adapted but why?
 
     // Create and attach event handler
     let handler = MiniPanelEventHandler::new();

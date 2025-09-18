@@ -1,5 +1,6 @@
 mod command;
 mod panel;
+mod permissions;
 mod tray;
 
 use tauri::Manager;
@@ -17,6 +18,7 @@ pub fn run() {
             command::hide_panel,
             command::close_panel,
             command::type_emoji,
+            command::reset_accessibility_cache,
         ])
         .setup(|app| {
             // Set activation policy to Accessory to prevent the app icon from showing on the dock
@@ -36,13 +38,14 @@ pub fn run() {
                     if event.state == ShortcutState::Pressed
                         && shortcut.matches(Modifiers::SUPER, Code::KeyK)
                     {
-                        let panel = app.app_handle().get_webview_panel("main").unwrap();
-
-                        if panel.is_visible() {
-                            panel.hide();
+                        if let Ok(panel) = app.app_handle().get_webview_panel("main") {
+                            if panel.is_visible() {
+                                panel.hide();
+                            } else {
+                                panel.show_and_make_key();
+                            }
                         } else {
-                            // window.center_at_cursor_monitor().unwrap();
-                            panel.show_and_make_key();
+                            eprintln!("Failed to get main panel");
                         }
                     }
                 })
