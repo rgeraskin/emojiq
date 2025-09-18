@@ -219,13 +219,16 @@ class EmojiManager:
 
         # Handle empty or short filter
         if len(filter_word) < 2:
+            logger.info("Getting all emojis")
             # Return all emojis ordered by usage
             emoji_list = [emoji_data["emoji"] for emoji_data in self._emojis]
         else:
+            logger.info("Getting emojis for filter word: '%s'", filter_word)
             # Use direct keyword search (like original) for correct substring matching
             emoji_list = self._index.get(filter_word, [])
 
         ordered_emojis = self._order_emojis_by_usage(emoji_list)
+        logger.info("Found %d emojis", len(ordered_emojis))
         return " ".join(ordered_emojis)
 
     def get_keywords(self, emoji: str) -> str:
@@ -237,6 +240,7 @@ class EmojiManager:
 
     def increment_usage(self, emoji: str) -> None:
         """Increment usage count for an emoji."""
+        logger.info("Incrementing usage for emoji: '%s'", emoji)
         self._load_ranks()
 
         self._ranks[emoji] = self._ranks.get(emoji, 0) + 1

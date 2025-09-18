@@ -1,6 +1,19 @@
 const { invoke } = window.__TAURI__.core;
 const python = window.__TAURI__.python.callFunction;
 
+// Configuration constants
+const CONFIG = {
+  EMOJI_BATCH_SIZE: 100,
+  SEARCH_DEBOUNCE_MS: 150,
+  GRID_COLUMNS: 10,
+  BUTTON_FOCUS_DELAY_MS: 100,
+};
+
+// Polyfill for requestIdleCallback if not available (Tauri webview compatibility)
+const requestIdleCallback = window.requestIdleCallback || function (callback) {
+  return setTimeout(callback, 16); // ~60fps fallback
+};
+
 // DOM elements
 const searchInput = document.getElementById('searchInput');
 const emojiGrid = document.getElementById('emojiGrid');
@@ -10,6 +23,8 @@ const statusBar = document.getElementById('statusBar');
 let gridEmojis = [];
 let currentFilter = '';
 let previousElementIndex = 0;
+let emojiCache = new Map(); // Cache for rendered emoji buttons
+let currentBatch = 0;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async function () {
@@ -30,20 +45,16 @@ async function renderPanel() {
   handleSearchMouseOver();
 }
 
-// Setup event listeners
+// Setup event listeners with delegation
 function setupEventListeners() {
   searchInput.addEventListener('input', handleSearch);
   searchInput.addEventListener('mouseover', handleSearchMouseOver);
   searchInput.addEventListener('keydown', handleSearchKeys);
 
-  emojiGrid.addEventListener('keydown', handleNavigation);
-
-  // Outside click
-  // settingsModal.addEventListener('click', function (e) {
-  //   if (e.target === settingsModal) {
-  //     closeModal();
-  //   }
-  // });
+  // Use event delegation for emoji grid
+  emojiGrid.addEventListener('keydown', handleGridNavigation);
+  emojiGrid.addEventListener('click', handleEmojiClick);
+  emojiGrid.addEventListener('mouseover', handleEmojiMouseOver);
 
   // Global shortcuts
   window.addEventListener('keydown', async function (e) {
@@ -55,26 +66,57 @@ function setupEventListeners() {
   });
 }
 
+// Event delegation handlers
+function handleEmojiClick(e) {
+  if (e.target.classList.contains('emoji-button')) {
+    const emoji = e.target.dataset.emoji || e.target.textContent;
+    selectEmoji(emoji);
+  }
+}
+
+function handleEmojiMouseOver(e) {
+  if (e.target.classList.contains('emoji-button')) {
+    const emoji = e.target.dataset.emoji || e.target.textContent;
+    updateKeywords(emoji);
+  }
+}
+
 // Load emojis from backend
 async function loadEmojis(filter = '') {
   try {
-    let emojis;
+    // Show loading state
+    updateStatus('Loading emojis...');
 
-    emojis = await python("get_emojis", [filter]);
+    const emojis = await python("get_emojis", [filter]);
 
-    // split emojis string by space
-    emojis = emojis.split(' ');
+    // Validate response
+    if (typeof emojis !== 'string') {
+      throw new Error('Invalid response format from backend');
+    }
 
-    gridEmojis = emojis || [];
+    // Split emojis string by space and filter empty strings
+    gridEmojis = emojis.split(' ').filter(emoji => emoji.trim() !== '');
+
     renderEmojis();
+
+    // Update status with results
+    if (gridEmojis.length > 0) {
+      updateStatus(`Found ${gridEmojis.length} emoji${gridEmojis.length !== 1 ? 's' : ''}`);
+    } else {
+      updateStatus('Need mooooore emojis 😜');
+    }
   } catch (error) {
     console.error('Error loading emojis:', error);
-    statusBar.textContent = 'Error loading emojis: ' + error.message;
+    gridEmojis = [];
+    renderEmojis();
+    updateStatus(`Error: ${error.message || 'Failed to load emojis'}`);
   }
 }
 
 // Render emojis in grid
 function renderEmojis() {
+  // Clear previous content efficiently
+  const fragment = document.createDocumentFragment();
   emojiGrid.innerHTML = '';
   previousElementIndex = 0;
 
@@ -86,36 +128,82 @@ function renderEmojis() {
     return;
   }
 
-  for (let i = 0; i < gridEmojis.length; i++) {
-    const emoji = gridEmojis[i];
-    const button = document.createElement('button');
-    button.className = 'emoji-button';
-    button.textContent = emoji;
+  // Render emojis in batches to improve performance
+  const endIndex = Math.min(gridEmojis.length, CONFIG.EMOJI_BATCH_SIZE);
 
-    button.addEventListener('click', () => selectEmoji(emoji));
-    button.addEventListener('mouseover', () => updateKeywords(emoji));
-    emojiGrid.appendChild(button);
+  for (let i = 0; i < endIndex; i++) {
+    const emoji = gridEmojis[i];
+    if (!emoji) continue; // Skip empty emojis
+
+    const button = createEmojiButton(emoji);
+    fragment.appendChild(button);
+  }
+
+  emojiGrid.appendChild(fragment);
+
+  // Load more emojis if needed (lazy loading)
+  if (gridEmojis.length > CONFIG.EMOJI_BATCH_SIZE) {
+    requestIdleCallback(() => loadMoreEmojis(endIndex));
   }
 }
 
-// Handle search input
+// Create emoji button
+function createEmojiButton(emoji) {
+  const button = document.createElement('button');
+  button.className = 'emoji-button';
+  button.textContent = emoji;
+  button.dataset.emoji = emoji; // Store emoji in data attribute for reliability
+  return button;
+}
+
+// Load more emojis lazily
+function loadMoreEmojis(startIndex) {
+  const fragment = document.createDocumentFragment();
+  const endIndex = Math.min(gridEmojis.length, startIndex + CONFIG.EMOJI_BATCH_SIZE);
+
+  for (let i = startIndex; i < endIndex; i++) {
+    const emoji = gridEmojis[i];
+    if (!emoji) continue;
+
+    const button = createEmojiButton(emoji);
+    fragment.appendChild(button);
+  }
+
+  emojiGrid.appendChild(fragment);
+
+  if (endIndex < gridEmojis.length) {
+    requestIdleCallback(() => loadMoreEmojis(endIndex));
+  }
+}
+
+// Handle search input with debouncing
+let searchController; // AbortController for canceling requests
+
 async function handleSearch(e) {
   const filter = e.target.value.trim();
   currentFilter = filter;
 
-  // Debounce search
+  // Cancel previous request if still pending
+  if (searchController) {
+    searchController.abort();
+  }
+
+  // Create new controller for this request
+  searchController = new AbortController();
+
+  // Debounce search with delay
   clearTimeout(handleSearch.timeout);
   handleSearch.timeout = setTimeout(async () => {
-    if (currentFilter === filter) {
-      await loadEmojis(filter);
-      if (gridEmojis.length > 0 && gridEmojis[0] !== '') {
-        console.log(gridEmojis[0], gridEmojis.length);
-        updateStatus(`Found ${gridEmojis.length} emoji${gridEmojis.length !== 1 ? 's' : ''}`);
-      } else {
-        updateStatus('No emojis found');
+    if (currentFilter === filter && !searchController.signal.aborted) {
+      try {
+        await loadEmojis(filter);
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Search error:', error);
+        }
       }
     }
-  }, 200);
+  }, CONFIG.SEARCH_DEBOUNCE_MS);
 }
 
 function handleSearchMouseOver() {
@@ -125,7 +213,7 @@ function handleSearchMouseOver() {
 
 // Handle search keys
 async function handleSearchKeys(e) {
-  console.log("searchInput keydown:", e.key);
+  // console.log("searchInput keydown:", e.key);
   switch (e.key) {
     case "ArrowDown":
       e.preventDefault();
@@ -142,7 +230,7 @@ async function handleSearchKeys(e) {
       if (firstButton.textContent) {
         buttonFocus(firstButton);
         // give a chance to user to notice the focus before clicking
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, CONFIG.BUTTON_FOCUS_DELAY_MS));
         firstButton.click();
       }
       break;
@@ -155,8 +243,8 @@ async function updateKeywords(emoji) {
   const keywordsArray = keywords.split(';');
   const description = keywordsArray[0];
   const keys = keywordsArray.slice(1).join(', ');
-  console.log("buttonFocus:", emoji);
-  console.log("keywords:", keywordsArray);
+  // console.log("buttonFocus:", emoji);
+  // console.log("keywords:", keywordsArray);
   updateStatus(`${description}\n${keys}`);
   statusBar.className = 'status-bar-keywords';
 }
@@ -167,67 +255,63 @@ async function buttonFocus(button) {
   await updateKeywords(emoji);
 }
 
-// Handle keyboard navigation
-function handleNavigation(e) {
+// Handle keyboard navigation in emoji grid
+function handleGridNavigation(e) {
   const buttons = emojiGrid.querySelectorAll('.emoji-button');
   if (buttons.length === 0) return;
 
   const focused = document.activeElement;
+  if (!focused.classList.contains('emoji-button')) return;
+
   let elementIndex = Array.from(buttons).indexOf(focused);
-  let column = elementIndex % 10;
-  let row = Math.floor(elementIndex / 10);
-  console.log("Grid elementIndex:", elementIndex, "column:", column, "row:", row);
-  console.log("Grid key:", e.key);
+  let column = elementIndex % CONFIG.GRID_COLUMNS;
+  let row = Math.floor(elementIndex / CONFIG.GRID_COLUMNS);
+  const totalRows = Math.ceil(buttons.length / CONFIG.GRID_COLUMNS);
 
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
-      row++;
-      elementIndex = row * 10 + column;
-      if (elementIndex >= buttons.length) {
-        elementIndex = buttons.length - 1;
+      if (row < totalRows - 1) {
+        row++;
+        elementIndex = Math.min(row * CONFIG.GRID_COLUMNS + column, buttons.length - 1);
+        buttonFocus(buttons[elementIndex]);
       }
-      buttonFocus(buttons[elementIndex]);
       break;
     case 'ArrowUp':
       e.preventDefault();
       if (row === 0) {
         searchInput.focus();
         previousElementIndex = elementIndex;
-        break;
+      } else {
+        row--;
+        elementIndex = row * CONFIG.GRID_COLUMNS + column;
+        buttonFocus(buttons[elementIndex]);
       }
-      row--;
-      elementIndex = row * 10 + column;
-      buttonFocus(buttons[elementIndex]);
       break;
     case 'ArrowRight':
       e.preventDefault();
-      if (column === 9) {
-        row++;
-        column = 0;
-      } else {
-        column++;
-      }
-      elementIndex = row * 10 + column;
-      if (elementIndex < buttons.length) {
+      if (elementIndex < buttons.length - 1) {
+        elementIndex++;
         buttonFocus(buttons[elementIndex]);
       }
       break;
     case 'ArrowLeft':
       e.preventDefault();
-      if (column === 0 && row === 0) {
-        break;
+      if (elementIndex > 0) {
+        elementIndex--;
+        buttonFocus(buttons[elementIndex]);
       }
-      if (column === 0) {
-        row--;
-        column = 9;
-      } else {
-        column--;
-      }
-      elementIndex = row * 10 + column;
-      buttonFocus(buttons[elementIndex]);
+      break;
+    case 'Home':
+      e.preventDefault();
+      buttonFocus(buttons[0]);
+      break;
+    case 'End':
+      e.preventDefault();
+      buttonFocus(buttons[buttons.length - 1]);
       break;
     case 'Enter':
+    case ' ':
       e.preventDefault();
       focused.click();
       break;
@@ -238,29 +322,14 @@ function handleNavigation(e) {
 async function selectEmoji(emoji) {
   console.log("selectEmoji:", emoji);
   try {
-    // // Call backend to increment usage and copy to clipboard
-    // await window.wails.App.SelectEmoji(emoji.Character);
-    // await window.wails.App.CopyEmojiToClipboard(emoji.Character);
-
     await invoke("hide_panel");
     await invoke("type_emoji", { emoji: emoji });
     await python("increment_usage", [emoji]);
-    await renderPanel();
-
-    // updateStatus(`Copied ${emoji} to clipboard! Press Cmd+V to paste.`);
-
-    // // Reload emojis to update usage counts
-    // setTimeout(() => loadEmojis(currentFilter), 100);
-
-    // // Auto-hide after selection (would be handled by Wails window management)
-    // setTimeout(() => {
-    //   updateStatus('Click an emoji to copy it to clipboard');
-    // }, 2000);
-
   } catch (error) {
     console.error('Error selecting emoji:', error);
-    updateStatus('Error copying emoji to clipboard');
+    updateStatus('Error pasting emoji o_0');
   }
+  await renderPanel();
 }
 
 // Update status bar
