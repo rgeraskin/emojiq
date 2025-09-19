@@ -1,3 +1,4 @@
+use crate::emoji_manager;
 use crate::permissions::{ensure_accessibility_permission, reset_permission_cache};
 use enigo::{Enigo, Keyboard, Settings};
 use tauri::AppHandle;
@@ -52,4 +53,20 @@ pub async fn type_emoji(_: AppHandle, emoji: String) -> Result<(), String> {
 #[tauri::command]
 pub fn reset_accessibility_cache() {
     reset_permission_cache();
+}
+
+// Emoji manager commands
+#[tauri::command]
+pub fn get_emojis(filter_word: String) -> Result<Vec<String>, String> {
+    emoji_manager::get_emojis(&filter_word)
+}
+
+#[tauri::command]
+pub fn get_keywords(emoji: String) -> Result<Vec<String>, String> {
+    emoji_manager::get_keywords(&emoji)
+}
+
+#[tauri::command]
+pub fn increment_usage(emoji: String) -> Result<(), String> {
+    emoji_manager::increment_usage(&emoji)
 }

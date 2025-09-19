@@ -1,4 +1,5 @@
 mod command;
+pub mod emoji_manager;
 mod panel;
 mod permissions;
 mod tray;
@@ -10,7 +11,6 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_python::init())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_nspanel::init())
         .invoke_handler(tauri::generate_handler![
@@ -19,10 +19,29 @@ pub fn run() {
             command::close_panel,
             command::type_emoji,
             command::reset_accessibility_cache,
+            command::get_emojis,
+            command::get_keywords,
+            command::increment_usage,
         ])
         .setup(|app| {
             // Set activation policy to Accessory to prevent the app icon from showing on the dock
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            // Check accessibility permissions at startup
+            tauri::async_runtime::spawn(async {
+                match permissions::ensure_accessibility_permission().await {
+                    Ok(_) => (),
+                    Err(e) => {
+                        println!("⚠️  Accessibility permission issue: {}", e);
+                        println!("   App will work for browsing emojis, but pasting may not work until permission is granted.");
+                    }
+                }
+            });
+
+            // Initialize emoji manager
+            if let Err(e) = emoji_manager::initialize_global_manager() {
+                println!("Warning: Failed to initialize emoji manager: {}", e);
+            }
 
             panel::init(app.app_handle())?;
             tray::init(app.app_handle())?;

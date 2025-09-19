@@ -7,7 +7,6 @@
   ],
   "permissions": [
     "core:default",
-    "python:default",
     "core:window:allow-start-dragging",
     "core:window:deny-internal-toggle-maximize",
     "macos-permissions:default"

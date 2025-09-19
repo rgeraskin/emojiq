@@ -1,5 +1,4 @@
 const { invoke } = window.__TAURI__.core;
-const python = window.__TAURI__.python.callFunction;
 
 // Configuration constants
 const CONFIG = {
@@ -87,15 +86,15 @@ async function loadEmojis(filter = '') {
     // Show loading state
     updateStatus('Loading emojis...');
 
-    const emojis = await python("get_emojis", [filter]);
+    const emojis = await invoke("get_emojis", { filterWord: filter });
 
     // Validate response
-    if (typeof emojis !== 'string') {
+    if (!Array.isArray(emojis)) {
       throw new Error('Invalid response format from backend');
     }
 
-    // Split emojis string by space and filter empty strings
-    gridEmojis = emojis.split(' ').filter(emoji => emoji.trim() !== '');
+    // Trim emojis to avoid empty strings
+    gridEmojis = emojis.filter(emoji => emoji.trim() !== '');
 
     renderEmojis();
 
@@ -238,13 +237,11 @@ async function handleSearchKeys(e) {
 }
 
 async function updateKeywords(emoji) {
-  const keywords = await python("get_keywords", [emoji]);
-  // split keywords by semicolon
-  const keywordsArray = keywords.split(';');
-  const description = keywordsArray[0];
-  const keys = keywordsArray.slice(1).join(', ');
+  const keywords = await invoke("get_keywords", { emoji: emoji });
+  const description = keywords[0] || '';
+  const keys = keywords.slice(1).join(', ');
   // console.log("buttonFocus:", emoji);
-  // console.log("keywords:", keywordsArray);
+  // console.log("keywords:", keywords);
   updateStatus(`${description}\n${keys}`);
   statusBar.className = 'status-bar-keywords';
 }
@@ -324,7 +321,7 @@ async function selectEmoji(emoji) {
   try {
     await invoke("hide_panel");
     await invoke("type_emoji", { emoji: emoji });
-    await python("increment_usage", [emoji]);
+    await invoke("increment_usage", { emoji: emoji });
   } catch (error) {
     console.error('Error selecting emoji:', error);
     updateStatus('Error pasting emoji o_0');
