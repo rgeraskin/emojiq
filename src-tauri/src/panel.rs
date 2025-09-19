@@ -3,8 +3,9 @@
     windows_subsystem = "windows"
 )]
 
+use crate::positioning::{position_window_at_cursor, restore_previous_app, store_previous_app};
 use tauri::{AppHandle, Manager, WebviewWindow};
-use tauri_nspanel::{tauri_panel, CollectionBehavior, StyleMask, WebviewWindowExt};
+use tauri_nspanel::{tauri_panel, CollectionBehavior, ManagerExt, StyleMask, WebviewWindowExt};
 
 // Define custom panel class and event handler
 tauri_panel! {
@@ -25,11 +26,10 @@ tauri_panel! {
 pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     let window: WebviewWindow = app_handle.get_webview_window("main").unwrap();
     let panel = window.to_panel::<EmojiqPanel>().unwrap();
-    panel.hide();
+    let _ = hide_panel(app_handle.clone());
 
-    // Start with normal style mask to allow focus
-    // We'll apply nonactivating_panel only when hiding for fullscreen compatibility
-    panel.set_style_mask(StyleMask::empty().into());
+    // Prevent panel from activating the app (required for fullscreen display)
+    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
 
     // Allow panel to display over fullscreen windows and join all spaces
     panel.set_collection_behavior(
@@ -65,5 +65,84 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
 
     panel.set_event_handler(Some(handler.as_ref()));
 
+    Ok(())
+}
+
+pub fn hide_panel(handle: AppHandle) -> Result<(), String> {
+    let panel = handle
+        .get_webview_panel("main")
+        .map_err(|e| format!("Failed to get main panel: {:?}", e))?;
+
+    if panel.is_visible() {
+        println!("Panel is visible, hiding panel via command");
+        panel.hide();
+
+        // Restore focus to the previously active application
+        restore_previous_app();
+    } else {
+        println!("Panel is already hidden, why are we trying to hide it?");
+    }
+    Ok(())
+}
+
+pub fn show_panel(handle: AppHandle) -> Result<(), String> {
+    // Store the currently active application before showing our panel
+    store_previous_app();
+
+    // Get the window first, then convert to panel (more reliable)
+    if let Some(window) = handle.get_webview_window("main") {
+        // Position panel BEFORE showing the panel
+        if let Err(e) = position_window_at_cursor(&window) {
+            println!(
+                "Warning: Failed to position panel at cursor: {}. Using default positioning.",
+                e
+            );
+        }
+
+        let panel = handle
+            .get_webview_panel("main")
+            .map_err(|e| format!("Failed to get main panel: {:?}", e))?;
+        panel.show_and_make_key();
+
+        // Show panel after positioning is complete
+        panel.show_and_make_key();
+
+        // Multiple attempts to ensure focus
+        // panel.make_key_and_order_front();
+
+        // Force the panel to become key and focused
+        // panel.make_key_and_order_front();
+
+        // Set focus to allow ESC key detection
+        // match window.set_focus() {
+        //     Ok(_) => println!("Successfully set focus on window for ESC detection"),
+        //     Err(e) => println!("Failed to set focus on window: {:?}", e),
+        // }
+
+        // Debug focus state
+        match window.is_focused() {
+            Ok(focused) => println!("Window focus state: {}", focused),
+            Err(e) => println!("Failed to check focus state: {:?}", e),
+        }
+
+        // Try to force visual focus by making it the key window again
+        // panel.make_key_and_order_front();
+
+        Ok(())
+    } else {
+        Err("Failed to get main window".to_string())
+    }
+}
+
+pub fn toggle_panel(handle: AppHandle) -> Result<(), String> {
+    let panel = handle
+        .get_webview_panel("main")
+        .map_err(|e| format!("Failed to get main panel: {:?}", e))?;
+
+    if panel.is_visible() {
+        let _ = hide_panel(handle);
+    } else {
+        let _ = show_panel(handle);
+    }
     Ok(())
 }

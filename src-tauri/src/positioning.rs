@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use tauri::{PhysicalPosition, Position};
 
 #[cfg(target_os = "macos")]
@@ -7,6 +8,11 @@ use cocoa::foundation::{NSPoint, NSRect};
 
 #[cfg(not(target_os = "macos"))]
 use monitor::get_monitor_with_cursor;
+
+// Global storage for the previously active application
+lazy_static::lazy_static! {
+    static ref PREVIOUS_APP: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+}
 
 // Simple rect structure for non-macOS platforms
 #[cfg(not(target_os = "macos"))]
@@ -116,30 +122,6 @@ fn get_visible_screen_area() -> Result<(NSRect, f64), PositioningError> {
                     size: screen_visible_frame.size,
                 };
 
-                println!("Found screen with cursor:");
-                println!(
-                    "  Full frame: {}x{} at ({}, {})",
-                    screen_frame.size.width,
-                    screen_frame.size.height,
-                    screen_frame.origin.x,
-                    screen_frame.origin.y
-                );
-                println!(
-                    "  Visible frame (Cocoa): {}x{} at ({}, {})",
-                    screen_visible_frame.size.width,
-                    screen_visible_frame.size.height,
-                    screen_visible_frame.origin.x,
-                    screen_visible_frame.origin.y
-                );
-                println!(
-                    "  Visible frame (converted): {}x{} at ({}, {})",
-                    visible_frame.size.width,
-                    visible_frame.size.height,
-                    visible_frame.origin.x,
-                    visible_frame.origin.y
-                );
-                println!("  Scale factor: {}", scale_factor);
-
                 return Ok((visible_frame, scale_factor));
             }
         }
@@ -186,25 +168,6 @@ pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), Po
         y: panel_size.height as f64 / scale_factor,
     };
 
-    println!("Debug positioning (dock-aware):");
-    println!("  Cursor: ({}, {})", cursor_pos.x, cursor_pos.y);
-    println!(
-        "  Panel size (physical): {}x{}",
-        panel_size.width, panel_size.height
-    );
-    println!(
-        "  Panel size (logical): {}x{}",
-        panel_logical_size.x, panel_logical_size.y
-    );
-    println!(
-        "  Visible area: {}x{} at ({}, {}), scale: {}",
-        visible_area.width(),
-        visible_area.height(),
-        visible_area.left(),
-        visible_area.top(),
-        scale_factor
-    );
-
     // Calculate visible area bounds in logical coordinates (to match cursor)
     let visible_left = visible_area.left();
     let visible_top = visible_area.top();
@@ -215,7 +178,7 @@ pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), Po
     let fits_right = cursor_pos.x + panel_logical_size.x <= visible_right;
     let fits_below = cursor_pos.y + panel_logical_size.y <= visible_bottom;
 
-    println!("  Fits right: {}, fits below: {}", fits_right, fits_below);
+    // println!("  Fits right: {}, fits below: {}", fits_right, fits_below);
 
     // Determine panel position based on available space (using logical coordinates)
     let panel_x = if fits_right {
@@ -238,16 +201,9 @@ pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), Po
         .max(visible_top)
         .min(visible_bottom - panel_logical_size.y);
 
-    println!("  Final position (logical): ({}, {})", final_x, final_y);
-
     // Convert back to physical coordinates for Tauri API
     let physical_x = (final_x * scale_factor) as i32;
     let physical_y = (final_y * scale_factor) as i32;
-
-    println!(
-        "  Final position (physical): ({}, {})",
-        physical_x, physical_y
-    );
 
     // Set panel position using Tauri API
     let position = Position::Physical(PhysicalPosition {
@@ -293,4 +249,60 @@ fn get_cursor_position() -> Result<PhysicalPosition<f64>, PositioningError> {
         // For non-macOS platforms, we'd need different implementation
         Err(PositioningError::MonitorNotFound)
     }
+}
+
+// Function to store the currently active application
+#[cfg(target_os = "macos")]
+pub fn store_previous_app() {
+    println!("Storing previous app...");
+
+    // Use AppleScript to get the frontmost application
+    use std::process::Command;
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg("tell application \"System Events\" to get bundle identifier of first application process whose frontmost is true")
+        .output();
+
+    if let Ok(output) = output {
+        if let Ok(bundle_id) = String::from_utf8(output.stdout) {
+            let bundle_id = bundle_id.trim().to_string();
+            if !bundle_id.is_empty() && bundle_id != "com.emojiq.app" {
+                if let Ok(mut previous_app) = PREVIOUS_APP.lock() {
+                    *previous_app = Some(bundle_id.clone());
+                    println!("Stored previous app: {}", bundle_id);
+                }
+            }
+        }
+    }
+}
+
+// Function to restore focus to the previously active application
+#[cfg(target_os = "macos")]
+pub fn restore_previous_app() {
+    println!("Restoring previous app...");
+
+    if let Ok(previous_app) = PREVIOUS_APP.lock() {
+        if let Some(bundle_id) = previous_app.as_ref() {
+            println!("Restoring focus to: {}", bundle_id);
+
+            // Use AppleScript to activate the application
+            use std::process::Command;
+
+            let script = format!("tell application id \"{}\" to activate", bundle_id);
+            let _output = Command::new("osascript").arg("-e").arg(&script).output();
+        } else {
+            println!("No previous app stored");
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn store_previous_app() {
+    // No-op for non-macOS platforms
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn restore_previous_app() {
+    // No-op for non-macOS platforms
 }
