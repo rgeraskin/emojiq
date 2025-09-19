@@ -31,7 +31,10 @@ enigo = "0.6"
 # Additional dependencies for emoji manager
 once_cell = "1.19"
 dirs = "5.0"
-# monitor = { git = "https://github.com/ahkohd/tauri-toolkit", branch = "v2" } # why?
+monitor = { git = "https://github.com/ahkohd/tauri-toolkit", branch = "v2" }
+cocoa = "0.25"
+objc = "0.2"
+lazy_static = "1.4"
 # tauri-plugin-opener = "2"
 
 [dev-dependencies]

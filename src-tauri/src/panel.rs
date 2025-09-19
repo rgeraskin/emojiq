@@ -11,7 +11,7 @@ tauri_panel! {
     panel!(EmojiqPanel {
         config: {
             can_become_key_window: true,
-            can_become_main_window: false,
+            can_become_main_window: true,
             is_floating_panel: true
         }
     })
@@ -27,8 +27,9 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     let panel = window.to_panel::<EmojiqPanel>().unwrap();
     panel.hide();
 
-    // Prevent panel from activating the app (required for fullscreen display)
-    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
+    // Start with normal style mask to allow focus
+    // We'll apply nonactivating_panel only when hiding for fullscreen compatibility
+    panel.set_style_mask(StyleMask::empty().into());
 
     // Allow panel to display over fullscreen windows and join all spaces
     panel.set_collection_behavior(
@@ -51,9 +52,15 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     // Create and attach event handler
     let handler = MiniPanelEventHandler::new();
 
+    // Handle focus loss - hide panel and restore nonactivating_panel style
     let panel_for_handler = panel.clone();
     handler.window_did_resign_key(move |_notification| {
+        println!("Panel lost focus, hiding panel");
         panel_for_handler.hide();
+        // Restore nonactivating_panel for fullscreen compatibility
+        panel_for_handler.set_style_mask(StyleMask::empty().nonactivating_panel().into());
+
+        // No need to unregister ESC shortcut since we're not using global ESC
     });
 
     panel.set_event_handler(Some(handler.as_ref()));

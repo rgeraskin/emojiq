@@ -46,6 +46,8 @@ async function renderPanel() {
 
 // Setup event listeners with delegation
 function setupEventListeners() {
+  console.log('Setting up event listeners...');
+
   searchInput.addEventListener('input', handleSearch);
   searchInput.addEventListener('mouseover', handleSearchMouseOver);
   searchInput.addEventListener('keydown', handleSearchKeys);
@@ -61,7 +63,9 @@ function setupEventListeners() {
 
   // Global shortcuts
   window.addEventListener('keydown', async function (e) {
+    // console.log('Key pressed:', e.key);
     if (e.key === "Escape") {
+      // console.log('ESC key detected, hiding panel');
       e.preventDefault();
       await invoke("hide_panel");
       await renderPanel();
