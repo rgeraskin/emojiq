@@ -102,6 +102,13 @@ body {
   transform: scale(0.95);
 }
 
+.emoji-button:focus {
+  border: 2px solid #8cb3fb;
+  border-radius: 6px;
+  outline: none;
+  transform: scale(1.1);
+}
+
 /* Status Bar */
 #statusBar {
   flex: 0 0 auto;

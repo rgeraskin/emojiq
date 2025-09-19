@@ -49,6 +49,10 @@ function setupEventListeners() {
   searchInput.addEventListener('input', handleSearch);
   searchInput.addEventListener('mouseover', handleSearchMouseOver);
   searchInput.addEventListener('keydown', handleSearchKeys);
+  searchInput.addEventListener('click', async function (e) {
+    e.preventDefault();
+    previousElementIndex = 0;
+  });
 
   // Use event delegation for emoji grid
   emojiGrid.addEventListener('keydown', handleGridNavigation);
