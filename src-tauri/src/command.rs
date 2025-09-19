@@ -21,7 +21,7 @@ pub async fn type_emoji(_: AppHandle, emoji: String) -> Result<(), String> {
     // Ensure accessibility permission is granted (uses caching)
     ensure_accessibility_permission().await?;
 
-    // Panel show already hidden and focus to the previously active application is restored
+    // Panel is already hidden and focus to the previously active application is being restored
     // Short delay to allow focus restoration to complete
     std::thread::sleep(std::time::Duration::from_millis(FOCUS_RESTORATION_DELAY_MS));
 

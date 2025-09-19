@@ -1,10 +1,21 @@
+#![cfg_attr(target_os = "macos", allow(unexpected_cfgs))]
 use std::sync::{Arc, Mutex};
 use tauri::{PhysicalPosition, Position};
 
 #[cfg(target_os = "macos")]
+use crate::constants::APP_BUNDLE_IDENTIFIER;
+#[cfg(target_os = "macos")]
 use cocoa::appkit::NSScreen;
 #[cfg(target_os = "macos")]
-use cocoa::foundation::{NSPoint, NSRect};
+use cocoa::base::{id, nil};
+#[cfg(target_os = "macos")]
+use cocoa::foundation::{NSAutoreleasePool, NSPoint, NSRect, NSString};
+#[cfg(target_os = "macos")]
+use dispatch::Queue;
+#[cfg(target_os = "macos")]
+use libc::pthread_main_np;
+#[cfg(target_os = "macos")]
+use objc::{class, msg_send, sel, sel_impl};
 
 #[cfg(not(target_os = "macos"))]
 use monitor::get_monitor_with_cursor;
@@ -256,23 +267,35 @@ fn get_cursor_position() -> Result<PhysicalPosition<f64>, PositioningError> {
 pub fn store_previous_app() {
     println!("Storing previous app...");
 
-    // Use AppleScript to get the frontmost application
-    use std::process::Command;
-
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg("tell application \"System Events\" to get bundle identifier of first application process whose frontmost is true")
-        .output();
-
-    if let Ok(output) = output {
-        if let Ok(bundle_id) = String::from_utf8(output.stdout) {
-            let bundle_id = bundle_id.trim().to_string();
-            if !bundle_id.is_empty() && bundle_id != "com.emojiq.app" {
-                if let Ok(mut previous_app) = PREVIOUS_APP.lock() {
-                    *previous_app = Some(bundle_id.clone());
-                    println!("Stored previous app: {}", bundle_id);
+    #[cfg(target_os = "macos")]
+    unsafe {
+        let is_main = pthread_main_np() != 0;
+        let work = || {
+            let _pool = NSAutoreleasePool::new(nil);
+            let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
+            let frontmost: id = msg_send![workspace, frontmostApplication];
+            if frontmost != nil {
+                let bundle_id_ns: id = msg_send![frontmost, bundleIdentifier];
+                if bundle_id_ns != nil {
+                    let c_str = NSString::UTF8String(bundle_id_ns);
+                    if !c_str.is_null() {
+                        let bundle_id = std::ffi::CStr::from_ptr(c_str)
+                            .to_string_lossy()
+                            .into_owned();
+                        if !bundle_id.is_empty() && bundle_id != APP_BUNDLE_IDENTIFIER {
+                            if let Ok(mut previous_app) = PREVIOUS_APP.lock() {
+                                *previous_app = Some(bundle_id.clone());
+                                println!("Stored previous app: {}", bundle_id);
+                            }
+                        }
+                    }
                 }
             }
+        };
+        if is_main {
+            work();
+        } else {
+            Queue::main().exec_sync(work);
         }
     }
 }
@@ -285,12 +308,34 @@ pub fn restore_previous_app() {
     if let Ok(previous_app) = PREVIOUS_APP.lock() {
         if let Some(bundle_id) = previous_app.as_ref() {
             println!("Restoring focus to: {}", bundle_id);
-
-            // Use AppleScript to activate the application
-            use std::process::Command;
-
-            let script = format!("tell application id \"{}\" to activate", bundle_id);
-            let _output = Command::new("osascript").arg("-e").arg(&script).output();
+            // Use native Cocoa APIs to activate the app on the main thread
+            #[cfg(target_os = "macos")]
+            {
+                let bundle_id_owned = bundle_id.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(
+                        crate::constants::FOCUS_RESTORATION_DELAY_MS,
+                    ));
+                    Queue::main().exec_async(move || unsafe {
+                        let _pool = NSAutoreleasePool::new(nil);
+                        let ns_str: id = NSString::alloc(nil).init_str(&bundle_id_owned);
+                        // Use the correct API: runningApplicationsWithBundleIdentifier:
+                        let apps: id = msg_send![class!(NSRunningApplication), runningApplicationsWithBundleIdentifier: ns_str];
+                        if apps != nil {
+                            let count = cocoa::foundation::NSArray::count(apps);
+                            if count > 0 {
+                                let app = cocoa::foundation::NSArray::objectAtIndex(apps, 0);
+                                // NSApplicationActivateIgnoringOtherApps = 1
+                                let _: bool = msg_send![app, activateWithOptions: 1u64];
+                            } else {
+                                println!("No running app found with bundle id: {}", bundle_id_owned);
+                            }
+                        } else {
+                            println!("No running app array for bundle id: {}", bundle_id_owned);
+                        }
+                    });
+                });
+            }
         } else {
             println!("No previous app stored");
         }

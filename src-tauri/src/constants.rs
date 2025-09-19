@@ -18,6 +18,9 @@ pub const PANEL_CORNER_RADIUS: f64 = 12.0;
 pub const DEFAULT_EMOJI_FILE: &str = "src/emoji.json";
 pub const DEFAULT_RANKS_FILE: &str = ".emojiq_ranks.json";
 
+// App metadata
+pub const APP_BUNDLE_IDENTIFIER: &str = "dev.rgeraskin.emojiq";
+
 // Helper functions for common durations
 pub const fn write_delay() -> Duration {
     Duration::from_secs(RANK_WRITE_DELAY_SECS)

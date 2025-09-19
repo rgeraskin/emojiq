@@ -816,8 +816,10 @@ version = "0.1.0"
 dependencies = [
  "cocoa 0.25.0",
  "dirs 5.0.1",
+ "dispatch",
  "enigo",
  "lazy_static",
+ "libc",
  "monitor",
  "objc",
  "once_cell",
