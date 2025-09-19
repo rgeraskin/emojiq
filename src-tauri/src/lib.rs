@@ -1,13 +1,22 @@
 mod command;
+mod constants;
 pub mod emoji_manager;
 mod panel;
 mod permissions;
 mod positioning;
 mod tray;
 
+use std::sync::Arc;
 use tauri::Manager;
-
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+
+use crate::emoji_manager::EmojiManager;
+
+/// Application state containing shared resources
+#[derive(Debug)]
+pub struct AppState {
+    pub emoji_manager: Arc<EmojiManager>,
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -38,10 +47,14 @@ pub fn run() {
                 }
             });
 
-            // Initialize emoji manager
-            if let Err(e) = emoji_manager::initialize_global_manager() {
+            // Initialize emoji manager and add to app state
+            let emoji_manager = Arc::new(EmojiManager::default());
+            if let Err(e) = emoji_manager.initialize() {
                 println!("Warning: Failed to initialize emoji manager: {}", e);
             }
+
+            let app_state = AppState { emoji_manager };
+            app.manage(app_state);
 
             panel::init(app.app_handle())?;
             tray::init(app.app_handle())?;
@@ -60,64 +73,6 @@ pub fn run() {
                         && shortcut.matches(Modifiers::SUPER, Code::KeyK)
                     {
                         let _ = panel::toggle_panel(handle.clone());
-                            // let panel = match handle.get_webview_panel("main") {
-                            //     Ok(panel) => panel,
-                            //     Err(e) => {
-                            //         eprintln!("Failed to get main panel: {:?}", e);
-                            //         return;
-                            //     }
-                            // };
-
-                            // if panel.is_visible() {
-                            //     let _ = command::hide_panel(handle.clone());
-                            //     // Restore nonactivating_panel for fullscreen compatibility
-                            //     // panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
-                            // } else {
-                            //     let _ = command::show_panel(handle.clone());
-                            //     // // Store the currently active application before showing our panel
-                            //     // store_previous_app();
-
-                            //     // // Position panel BEFORE showing to prevent visible redrawing
-                            //     // if let Err(e) = positioning::position_window_at_cursor(&window) {
-                            //     //     println!("Warning: Failed to position panel at cursor: {}. Using default positioning.", e);
-                            //     // }
-                            //     // println!("Skipping style mask change to avoid panic...");
-                            //     // // Skip style mask change - it's causing the panic
-                            //     // // panel.set_style_mask(StyleMask::empty().titled().closable().into());
-                            //     // println!("Style mask change skipped");
-
-                            //     // println!("Showing panel...");
-                            //     // // Show panel after positioning is complete
-                            //     // panel.show_and_make_key();
-                            //     // println!("Panel shown successfully");
-
-                            //     // println!("Making panel key and order front...");
-                            //     // // Multiple attempts to ensure focus
-                            //     // panel.make_key_and_order_front();
-                            //     // println!("make_key_and_order_front completed");
-
-                            //     // println!("Setting focus...");
-                            //     // // Set focus to allow ESC key detection
-                            //     // match window.set_focus() {
-                            //     //     Ok(_) => println!("Successfully set focus on window for ESC detection"),
-                            //     //     Err(e) => println!("Failed to set focus on window: {:?}", e),
-                            //     // }
-
-                            //     // // Debug focus state
-                            //     // match window.is_focused() {
-                            //     //     Ok(focused) => println!("Window focus state: {}", focused),
-                            //     //     Err(e) => println!("Failed to check focus state: {:?}", e),
-                            //     // }
-
-                            //     // println!("Final make_key_and_order_front...");
-                            //     // // Try to force visual focus by making it the key window again
-                            //     // panel.make_key_and_order_front();
-                            //     // println!("Final make_key_and_order_front completed");
-
-                            //     // println!("Panel showing completed successfully!");
-
-                            //     // // ESC will be handled via JavaScript since webview now has focus
-                            // }
                     }
                 })
                 .build(),

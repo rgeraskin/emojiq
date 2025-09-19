@@ -1,8 +1,10 @@
+use crate::constants::*;
 use crate::emoji_manager;
 use crate::panel;
 use crate::permissions::{ensure_accessibility_permission, reset_permission_cache};
+use crate::AppState;
 use enigo::{Enigo, Keyboard, Settings};
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub fn show_panel(handle: AppHandle) -> Result<(), String> {
@@ -21,7 +23,7 @@ pub async fn type_emoji(_: AppHandle, emoji: String) -> Result<(), String> {
 
     // Panel show already hidden and focus to the previously active application is restored
     // Short delay to allow focus restoration to complete
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    std::thread::sleep(std::time::Duration::from_millis(FOCUS_RESTORATION_DELAY_MS));
 
     let mut enigo = Enigo::new(&Settings::default())
         .map_err(|e| format!("Failed to initialize Enigo: {}", e))?;
@@ -41,18 +43,18 @@ pub fn reset_accessibility_cache() {
 
 // Emoji manager commands
 #[tauri::command]
-pub fn get_emojis(filter_word: String) -> Result<Vec<String>, String> {
-    emoji_manager::get_emojis(&filter_word)
+pub fn get_emojis(state: State<AppState>, filter_word: String) -> Result<Vec<String>, String> {
+    emoji_manager::get_emojis(&state.emoji_manager, &filter_word)
 }
 
 #[tauri::command]
-pub fn get_keywords(emoji: String) -> Result<Vec<String>, String> {
-    emoji_manager::get_keywords(&emoji)
+pub fn get_keywords(state: State<AppState>, emoji: String) -> Result<Vec<String>, String> {
+    emoji_manager::get_keywords(&state.emoji_manager, &emoji)
 }
 
 #[tauri::command]
-pub fn increment_usage(emoji: String) -> Result<(), String> {
-    emoji_manager::increment_usage(&emoji)
+pub fn increment_usage(state: State<AppState>, emoji: String) -> Result<(), String> {
+    emoji_manager::increment_usage(&state.emoji_manager, &emoji)
 }
 
 // #[tauri::command]

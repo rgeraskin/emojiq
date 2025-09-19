@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+use crate::constants::*;
 use crate::positioning::{position_window_at_cursor, restore_previous_app, store_previous_app};
 use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_nspanel::{tauri_panel, CollectionBehavior, ManagerExt, StyleMask, WebviewWindowExt};
@@ -39,7 +40,8 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
             .into(),
     );
 
-    panel.set_corner_radius(12.0); // without it - panel edges are not rounded, only window edges are rounded
+    // without it - panel edges are not rounded, only window edges are rounded
+    panel.set_corner_radius(PANEL_CORNER_RADIUS);
 
     // panel.set_transparent(true); // works without it
     // panel.set_works_when_modal(true); // why?
@@ -99,34 +101,17 @@ pub fn show_panel(handle: AppHandle) -> Result<(), String> {
             );
         }
 
+        // Show panel after positioning is complete
         let panel = handle
             .get_webview_panel("main")
             .map_err(|e| format!("Failed to get main panel: {:?}", e))?;
         panel.show_and_make_key();
 
-        // Show panel after positioning is complete
-        panel.show_and_make_key();
-
-        // Multiple attempts to ensure focus
-        // panel.make_key_and_order_front();
-
-        // Force the panel to become key and focused
-        // panel.make_key_and_order_front();
-
-        // Set focus to allow ESC key detection
-        // match window.set_focus() {
-        //     Ok(_) => println!("Successfully set focus on window for ESC detection"),
-        //     Err(e) => println!("Failed to set focus on window: {:?}", e),
-        // }
-
         // Debug focus state
-        match window.is_focused() {
-            Ok(focused) => println!("Window focus state: {}", focused),
-            Err(e) => println!("Failed to check focus state: {:?}", e),
-        }
-
-        // Try to force visual focus by making it the key window again
-        // panel.make_key_and_order_front();
+        // match window.is_focused() {
+        //     Ok(focused) => println!("Window focus state: {}", focused),
+        //     Err(e) => println!("Failed to check focus state: {:?}", e),
+        // }
 
         Ok(())
     } else {

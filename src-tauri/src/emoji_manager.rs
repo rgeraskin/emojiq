@@ -1,11 +1,11 @@
-use once_cell::sync::Lazy;
+use crate::constants::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, Once, RwLock};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Emoji data structure matching the JSON format
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -19,13 +19,13 @@ pub struct EmojiData {
     pub ios_version: Option<String>,
 }
 
-/// Consolidated data structure for emoji manager
+/// Data structure for emoji manager
 #[derive(Debug, Default)]
 pub struct EmojiManagerData {
     pub emojis: Vec<EmojiData>,
     pub ranks: HashMap<String, u32>,
-    pub keywords: HashMap<String, Vec<String>>,
-    pub index: HashMap<String, HashSet<String>>,
+    pub keywords: HashMap<String, Arc<Vec<String>>>,
+    pub index: HashMap<String, Vec<usize>>,
     // Loading flags
     pub emojis_loaded: bool,
     pub ranks_loaded: bool,
@@ -45,7 +45,7 @@ pub struct EmojiManager {
     // Threading for file operations
     pending_writes: Arc<Mutex<bool>>,
     last_write_time: Arc<Mutex<Instant>>,
-    write_delay: Duration,
+    write_delay: std::time::Duration,
 
     // Initialization synchronization
     init_once: Once,
@@ -53,7 +53,7 @@ pub struct EmojiManager {
 
 impl Default for EmojiManager {
     fn default() -> Self {
-        Self::new("src/emoji.json".into(), ".emojiq_ranks.json".to_string())
+        Self::new(DEFAULT_EMOJI_FILE.into(), DEFAULT_RANKS_FILE.to_string())
     }
 }
 
@@ -69,7 +69,7 @@ impl EmojiManager {
             data: Arc::new(RwLock::new(EmojiManagerData::default())),
             pending_writes: Arc::new(Mutex::new(false)),
             last_write_time: Arc::new(Mutex::new(Instant::now())),
-            write_delay: Duration::from_secs(2),
+            write_delay: write_delay(),
             init_once: Once::new(),
         }
     }
@@ -236,7 +236,8 @@ impl EmojiManager {
                     }
                 }
 
-                keywords_map.insert(emoji.clone(), keywords);
+                // Use Arc to avoid cloning when accessing keywords
+                keywords_map.insert(emoji.clone(), Arc::new(keywords));
             }
         }
 
@@ -270,53 +271,61 @@ impl EmojiManager {
 
         let mut index_map = HashMap::new();
 
-        // Helper function to index keywords
+        // Helper function to index keywords using emoji indices for better memory efficiency
         let index_keyword =
-            |keywords: &[String], emoji: &str, index: &mut HashMap<String, HashSet<String>>| {
-                let filtered_keywords: Vec<&String> =
-                    keywords.iter().filter(|k| k.len() >= 2).collect();
+            |keywords: &[String], emoji_idx: usize, index: &mut HashMap<String, Vec<usize>>| {
+                let filtered_keywords: Vec<&String> = keywords
+                    .iter()
+                    .filter(|k| k.len() >= MIN_KEYWORD_LENGTH)
+                    .collect();
 
                 for keyword in filtered_keywords {
                     // Index full keyword
                     index
                         .entry(keyword.clone())
-                        .or_insert_with(HashSet::new)
-                        .insert(emoji.to_string());
+                        .or_insert_with(Vec::new)
+                        .push(emoji_idx);
 
-                    // Index prefixes for partial matching (min length 2)
+                    // Index prefixes for partial matching (min length MIN_KEYWORD_LENGTH)
                     let chars: Vec<char> = keyword.chars().collect();
-                    for i in 2..=chars.len() {
+                    for i in MIN_KEYWORD_LENGTH..=chars.len() {
                         let prefix: String = chars[..i].iter().collect();
-                        index
-                            .entry(prefix)
-                            .or_insert_with(HashSet::new)
-                            .insert(emoji.to_string());
+                        index.entry(prefix).or_insert_with(Vec::new).push(emoji_idx);
                     }
                 }
             };
 
-        // Build inverted index: keyword -> set of emojis (with read lock)
+        // Build inverted index: keyword -> vec of emoji indices (with read lock)
         {
             let data = self
                 .data
                 .read()
                 .map_err(|_| "Failed to acquire read lock for keywords data")?;
 
-            for (emoji, emoji_keywords) in data.keywords.iter() {
-                index_keyword(emoji_keywords, emoji, &mut index_map);
+            for (emoji_idx, emoji_data) in data.emojis.iter().enumerate() {
+                let emoji = &emoji_data.emoji;
+                if let Some(emoji_keywords) = data.keywords.get(emoji) {
+                    index_keyword(emoji_keywords, emoji_idx, &mut index_map);
 
-                // Also index individual words from multi-word keywords
-                for keyword in emoji_keywords {
-                    let words: Vec<String> = keyword
-                        .replace('-', " ")
-                        .split_whitespace()
-                        .map(|s| s.to_string())
-                        .collect();
+                    // Also index individual words from multi-word keywords
+                    for keyword in emoji_keywords.iter() {
+                        let words: Vec<String> = keyword
+                            .replace('-', " ")
+                            .split_whitespace()
+                            .map(|s| s.to_string())
+                            .collect();
 
-                    if words.len() > 1 {
-                        index_keyword(&words, emoji, &mut index_map);
+                        if words.len() > 1 {
+                            index_keyword(&words, emoji_idx, &mut index_map);
+                        }
                     }
                 }
+            }
+
+            // Remove duplicates and sort indices for better cache locality
+            for indices in index_map.values_mut() {
+                indices.sort_unstable();
+                indices.dedup();
             }
         }
 
@@ -368,8 +377,8 @@ impl EmojiManager {
             return emojis;
         }
 
-        // Get top 10 most used emojis
-        let top_emojis = self.get_top_emojis_from_ranks(&data.ranks, 10);
+        // Get top most used emojis
+        let top_emojis = self.get_top_emojis_from_ranks(&data.ranks, MAX_TOP_EMOJIS);
 
         // Create HashSets for O(1) lookups instead of O(n) contains() calls
         let top_emojis_set: HashSet<&String> = top_emojis.iter().collect();
@@ -464,30 +473,42 @@ impl EmojiManager {
         });
     }
 
-    /// Get filtered emojis as array
+    /// Get filtered emojis as array with optimized memory usage and result limits
     pub fn get_emojis(&self, filter_word: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         println!("get_emojis called with filter: '{}'", filter_word);
         let filter_word = filter_word.trim().to_lowercase();
 
-        let emoji_list: Vec<String> = if filter_word.len() < 2 {
-            println!("Getting all emojis");
-            // Everything is already loaded at startup
+        let emoji_list: Vec<String> = if filter_word.len() < MIN_SEARCH_LENGTH {
+            println!("Getting all emojis (filter too short)");
+            // Return all emojis when filter is too short, limited by MAX_SEARCH_RESULTS to avoid overwhelming UI
             let data = self
                 .data
                 .read()
                 .map_err(|_| "Failed to acquire read lock for emoji data")?;
-            data.emojis.iter().map(|e| e.emoji.clone()).collect()
+
+            data.emojis
+                .iter()
+                .take(MAX_SEARCH_RESULTS)
+                .map(|e| e.emoji.clone())
+                .collect()
         } else {
             println!("Getting emojis for filter word: '{}'", filter_word);
-            // Index is already built at startup
+            // Index is already built at startup, now using emoji indices
             let data = self
                 .data
                 .read()
                 .map_err(|_| "Failed to acquire read lock for index data")?;
-            data.index
-                .get(&filter_word)
-                .map(|set| set.iter().cloned().collect())
-                .unwrap_or_default()
+
+            if let Some(emoji_indices) = data.index.get(&filter_word) {
+                emoji_indices
+                    .iter()
+                    .take(MAX_SEARCH_RESULTS) // Limit results for better performance
+                    .filter_map(|&idx| data.emojis.get(idx))
+                    .map(|emoji_data| emoji_data.emoji.clone())
+                    .collect()
+            } else {
+                Vec::new()
+            }
         };
 
         // Order emojis by usage frequency
@@ -504,7 +525,13 @@ impl EmojiManager {
             .data
             .read()
             .map_err(|_| "Failed to acquire read lock for keywords data")?;
-        let emoji_keywords = data.keywords.get(emoji).cloned().unwrap_or_default();
+
+        // Clone the Arc contents to maintain API compatibility while being more efficient internally
+        let emoji_keywords = data
+            .keywords
+            .get(emoji)
+            .map(|arc_keywords| (**arc_keywords).clone())
+            .unwrap_or_default();
         Ok(emoji_keywords)
     }
 
@@ -529,35 +556,18 @@ impl EmojiManager {
     }
 }
 
-// Global instance
-static EMOJI_MANAGER: Lazy<EmojiManager> = Lazy::new(EmojiManager::default);
-
-/// Get or create the global emoji manager instance
-pub fn get_manager() -> &'static EmojiManager {
-    &EMOJI_MANAGER
-}
-
-/// Initialize the global emoji manager (call this at app startup)
-pub fn initialize_global_manager() -> Result<(), String> {
-    get_manager().initialize().map_err(|e| e.to_string())
-}
-
-// Public API functions (called from Tauri)
+// Public API functions
 /// Get filtered emojis as array
-pub fn get_emojis(filter_word: &str) -> Result<Vec<String>, String> {
-    get_manager()
-        .get_emojis(filter_word)
-        .map_err(|e| e.to_string())
+pub fn get_emojis(manager: &EmojiManager, filter_word: &str) -> Result<Vec<String>, String> {
+    manager.get_emojis(filter_word).map_err(|e| e.to_string())
 }
 
 /// Get keywords for an emoji as array
-pub fn get_keywords(emoji: &str) -> Result<Vec<String>, String> {
-    get_manager().get_keywords(emoji).map_err(|e| e.to_string())
+pub fn get_keywords(manager: &EmojiManager, emoji: &str) -> Result<Vec<String>, String> {
+    manager.get_keywords(emoji).map_err(|e| e.to_string())
 }
 
 /// Increment usage count for an emoji
-pub fn increment_usage(emoji: &str) -> Result<(), String> {
-    get_manager()
-        .increment_usage(emoji)
-        .map_err(|e| e.to_string())
+pub fn increment_usage(manager: &EmojiManager, emoji: &str) -> Result<(), String> {
+    manager.increment_usage(emoji).map_err(|e| e.to_string())
 }

@@ -196,11 +196,13 @@ fn test_build_index() {
     assert!(data.index_built);
     assert!(data.index.len() > 0);
 
-    // Check calendar emoji indexing
-    assert!(data.index.get("ca").unwrap().contains("📆"));
-    assert!(data.index.get("cal").unwrap().contains("📆"));
-    assert!(data.index.get("calendar").unwrap().contains("📆"));
-    assert!(data.index.get("schedule").unwrap().contains("📆"));
+    // Check calendar emoji indexing (now using indices instead of strings)
+    // Find the index of the calendar emoji
+    let calendar_idx = data.emojis.iter().position(|e| e.emoji == "📆").unwrap();
+    assert!(data.index.get("ca").unwrap().contains(&calendar_idx));
+    assert!(data.index.get("cal").unwrap().contains(&calendar_idx));
+    assert!(data.index.get("calendar").unwrap().contains(&calendar_idx));
+    assert!(data.index.get("schedule").unwrap().contains(&calendar_idx));
 }
 
 #[test]
@@ -227,10 +229,11 @@ fn test_get_emojis_empty_filter() {
     let result = manager.get_emojis("").unwrap();
     let emojis = result;
 
-    // Should have emojis (exact order depends on ranking logic)
-    assert!(emojis.len() >= 5);
+    // Should return all emojis (limited by MAX_SEARCH_RESULTS)
+    // We have 5 test emojis, so we should get all 5
+    assert_eq!(emojis.len(), 5);
 
-    // Check that our test emojis are present
+    // Check that our test emojis are present (from create_test_emoji_data)
     assert!(emojis.contains(&"😀".to_string()));
     assert!(emojis.contains(&"😃".to_string()));
     assert!(emojis.contains(&"📆".to_string()));
@@ -361,16 +364,61 @@ fn test_increment_usage_new_emoji() {
 
 #[test]
 fn test_public_api_functions() {
-    // Test that the public API functions work
-    // Note: These use the global instance, so they might interfere with each other
-    // In a real application, you'd want to use dependency injection
+    // Test that the public API functions work with dependency injection
+    let temp_dir = TempDir::new().unwrap();
+    let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
 
-    // These tests will fail if emoji.json doesn't exist, but that's expected
-    // in a test environment. The important thing is that the functions don't panic.
-    let _result = emojiq_lib::emoji_manager::get_emojis("");
-    let _result = emojiq_lib::emoji_manager::get_keywords("😀");
-    let _result = emojiq_lib::emoji_manager::increment_usage("😀");
+    let mut manager = EmojiManager::new(
+        emoji_file,
+        ranks_file
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string(),
+    );
+    manager.ranks_file_path = ranks_file;
+
+    // Initialize the manager
+    manager.load_emojis().unwrap();
+    manager.load_ranks().unwrap();
+    manager.build_keywords().unwrap();
+    manager.build_index().unwrap();
+
+    // Test the public API functions with the manager instance
+    let _result = emojiq_lib::emoji_manager::get_emojis(&manager, "");
+    let _result = emojiq_lib::emoji_manager::get_keywords(&manager, "😀");
+    let _result = emojiq_lib::emoji_manager::increment_usage(&manager, "😀");
 
     // Just test that the functions can be called without panicking
     assert!(true);
+}
+
+#[test]
+fn test_optimized_search_performance() {
+    let temp_dir = TempDir::new().unwrap();
+    let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
+
+    let mut manager = EmojiManager::new(
+        emoji_file,
+        ranks_file
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string(),
+    );
+    manager.ranks_file_path = ranks_file;
+
+    // Initialize the manager
+    manager.load_emojis().unwrap();
+    manager.load_ranks().unwrap();
+    manager.build_keywords().unwrap();
+    manager.build_index().unwrap();
+
+    // Test that short filters return all emojis (limited by MAX_SEARCH_RESULTS)
+    let result = manager.get_emojis("a").unwrap(); // Short filter
+    assert_eq!(result.len(), 5); // Should return all 5 test emojis
+
+    // Test that search results are limited
+    let result = manager.get_emojis("an").unwrap(); // Longer filter
+    assert!(result.len() <= 50); // Should be limited by MAX_SEARCH_RESULTS
 }
