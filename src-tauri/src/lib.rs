@@ -61,16 +61,16 @@ pub fn run() {
 
             Ok(())
         })
-        // Register global shortcuts (only Cmd+K, ESC will be registered dynamically)
+        // Register global shortcuts (only Option+Cmd+Space, ESC will be registered dynamically)
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcut(Shortcut::new(Some(Modifiers::SUPER), Code::KeyK))
+                .with_shortcut(Shortcut::new(Some(Modifiers::SUPER | Modifiers::ALT), Code::Space))
                 .unwrap()
                 .with_handler(|app, shortcut, event| {
                     let handle = app.app_handle();
-                    // Handle Cmd+K to toggle panel
+                    // Handle Option+Cmd+Space to toggle panel
                     if event.state == ShortcutState::Pressed
-                        && shortcut.matches(Modifiers::SUPER, Code::KeyK)
+                        && shortcut.matches(Modifiers::SUPER | Modifiers::ALT, Code::Space)
                     {
                         let _ = panel::toggle_panel(handle.clone());
                     }
