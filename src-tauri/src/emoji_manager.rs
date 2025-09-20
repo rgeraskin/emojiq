@@ -124,7 +124,21 @@ impl EmojiManager {
             }
         }
 
-        let content = fs::read_to_string(&self.emoji_file_path)?;
+        // Use embedded emoji data for production builds, fallback to file system for development
+        let content = if cfg!(debug_assertions) {
+            // Development: try to read from file system first, fallback to embedded
+            match fs::read_to_string(&self.emoji_file_path) {
+                Ok(content) => content,
+                Err(_) => {
+                    println!("Could not read emoji file from filesystem, using embedded data");
+                    include_str!("emoji.json").to_string()
+                }
+            }
+        } else {
+            // Production: always use embedded data
+            include_str!("emoji.json").to_string()
+        };
+
         let emoji_data: Vec<EmojiData> = serde_json::from_str(&content)?;
 
         // Update with write lock
