@@ -69,6 +69,17 @@ function setupEventListeners() {
       e.preventDefault();
       await invoke("hide_panel");
       await renderPanel();
+      return;
+    }
+
+    // Focus search input when typing any character (but not special keys)
+    const isTypingCharacter = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const isSearchFocused = document.activeElement === searchInput;
+
+    if (isTypingCharacter && !isSearchFocused) {
+      // Focus search input and let the character be typed
+      searchInput.focus();
+      // Don't prevent default - let the character be typed in the search input
     }
   });
 }
