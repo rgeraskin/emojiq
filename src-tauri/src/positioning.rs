@@ -1,15 +1,14 @@
 #![cfg_attr(target_os = "macos", allow(unexpected_cfgs))]
 use std::sync::{Arc, Mutex};
+#[cfg(not(target_os = "macos"))]
 use tauri::{PhysicalPosition, Position};
 
 #[cfg(target_os = "macos")]
 use crate::constants::APP_BUNDLE_IDENTIFIER;
 #[cfg(target_os = "macos")]
-use cocoa::appkit::NSScreen;
-#[cfg(target_os = "macos")]
 use cocoa::base::{id, nil};
 #[cfg(target_os = "macos")]
-use cocoa::foundation::{NSAutoreleasePool, NSPoint, NSRect, NSString};
+use cocoa::foundation::{NSAutoreleasePool, NSString};
 #[cfg(target_os = "macos")]
 use dispatch::Queue;
 #[cfg(target_os = "macos")]
@@ -17,74 +16,16 @@ use libc::pthread_main_np;
 #[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
 
-#[cfg(not(target_os = "macos"))]
-use monitor::get_monitor_with_cursor;
-
-// Global storage for the previously active application
-lazy_static::lazy_static! {
-    static ref PREVIOUS_APP: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-}
-
-// Simple rect structure for non-macOS platforms
-#[cfg(not(target_os = "macos"))]
-#[derive(Debug, Clone, Copy)]
-struct SimpleRect {
-    x: f64,
-    y: f64,
-    width: f64,
-    height: f64,
-}
-
-// Trait to unify rect access across platforms
-trait RectAccess {
-    fn left(&self) -> f64;
-    fn top(&self) -> f64;
-    fn width(&self) -> f64;
-    fn height(&self) -> f64;
-}
-
-#[cfg(target_os = "macos")]
-impl RectAccess for NSRect {
-    fn left(&self) -> f64 {
-        self.origin.x
-    }
-    fn top(&self) -> f64 {
-        self.origin.y
-    }
-    fn width(&self) -> f64 {
-        self.size.width
-    }
-    fn height(&self) -> f64 {
-        self.size.height
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-impl RectAccess for SimpleRect {
-    fn left(&self) -> f64 {
-        self.x
-    }
-    fn top(&self) -> f64 {
-        self.y
-    }
-    fn width(&self) -> f64 {
-        self.width
-    }
-    fn height(&self) -> f64 {
-        self.height
-    }
-}
-
 #[derive(Debug)]
 pub enum PositioningError {
-    MonitorNotFound,
+    // MonitorNotFound,
     WindowHandleError,
 }
 
 impl std::fmt::Display for PositioningError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PositioningError::MonitorNotFound => write!(f, "Monitor with cursor not found"),
+            // PositioningError::MonitorNotFound => write!(f, "Monitor with cursor not found"),
             PositioningError::WindowHandleError => write!(f, "Failed to get window handle"),
         }
     }
@@ -92,173 +33,71 @@ impl std::fmt::Display for PositioningError {
 
 impl std::error::Error for PositioningError {}
 
-/// Get the visible screen area (excluding dock and menu bar) for the screen containing the cursor
-#[cfg(target_os = "macos")]
-fn get_visible_screen_area() -> Result<(NSRect, f64), PositioningError> {
-    unsafe {
-        // Get cursor position first
-        let cursor_pos = get_cursor_position()?;
-
-        // Get all screens
-        let screens = NSScreen::screens(std::ptr::null_mut());
-        let screen_count = cocoa::foundation::NSArray::count(screens);
-
-        // Find the screen containing the cursor
-        for i in 0..screen_count {
-            let screen = cocoa::foundation::NSArray::objectAtIndex(screens, i);
-            let screen_frame = NSScreen::frame(screen);
-            let screen_visible_frame = NSScreen::visibleFrame(screen);
-            let scale_factor = NSScreen::backingScaleFactor(screen);
-
-            // Convert screen bounds to top-left origin coordinates (matching cursor)
-            let screen_top = screen_frame.size.height - screen_frame.origin.y;
-            let screen_bottom = screen_top - screen_frame.size.height;
-            let screen_left = screen_frame.origin.x;
-            let screen_right = screen_left + screen_frame.size.width;
-
-            // Check if cursor is within this screen
-            if cursor_pos.x >= screen_left
-                && cursor_pos.x <= screen_right
-                && cursor_pos.y >= screen_bottom
-                && cursor_pos.y <= screen_top
-            {
-                // Convert visible frame to top-left origin coordinates
-                let visible_frame = NSRect {
-                    origin: NSPoint {
-                        x: screen_visible_frame.origin.x,
-                        y: screen_frame.size.height
-                            - screen_visible_frame.origin.y
-                            - screen_visible_frame.size.height,
-                    },
-                    size: screen_visible_frame.size,
-                };
-
-                return Ok((visible_frame, scale_factor));
-            }
-        }
-
-        Err(PositioningError::MonitorNotFound)
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn get_visible_screen_area() -> Result<(SimpleRect, f64), PositioningError> {
-    // Fallback to monitor API for non-macOS
-    let monitor = get_monitor_with_cursor().ok_or(PositioningError::MonitorNotFound)?;
-    let monitor_scale_factor = monitor.scale_factor();
-    let monitor_size = monitor.size().to_logical::<f64>(monitor_scale_factor);
-    let monitor_position = monitor.position().to_logical::<f64>(monitor_scale_factor);
-
-    let rect = SimpleRect {
-        x: monitor_position.x,
-        y: monitor_position.y,
-        width: monitor_size.width,
-        height: monitor_size.height,
-    };
-    Ok((rect, monitor_scale_factor))
+// Global storage for the previously active application
+lazy_static::lazy_static! {
+    static ref PREVIOUS_APP: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
 }
 
 /// Position panel at cursor using the window directly
 /// This function works by taking a Tauri WebviewWindow and positioning it smartly
 /// It avoids the dock and menu bar by using the visible screen area
+/// macOS positioning
+/// I use Cocoa and Objective-C for this because, with the previous Tauri implementation, the panel would sometimes initially appear at its previous location before quickly moving to the new position.
+#[cfg(target_os = "macos")]
 pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), PositioningError> {
-    // Get cursor position in screen coordinates
-    let cursor_pos = get_cursor_position()?;
-
-    // Get panel size using Tauri API
-    let panel_size = window
-        .outer_size()
-        .map_err(|_| PositioningError::WindowHandleError)?;
-
-    // Get visible screen area (excluding dock and menu bar) for the screen with cursor
-    let (visible_area, scale_factor) = get_visible_screen_area()?;
-
-    // Convert panel size to logical pixels to match cursor coordinates
-    let panel_logical_size = PhysicalPosition {
-        x: panel_size.width as f64 / scale_factor,
-        y: panel_size.height as f64 / scale_factor,
-    };
-
-    // Calculate visible area bounds in logical coordinates (to match cursor)
-    let visible_left = visible_area.left();
-    let visible_top = visible_area.top();
-    let visible_right = visible_left + visible_area.width();
-    let visible_bottom = visible_top + visible_area.height();
-
-    // Calculate if panel fits in each direction from cursor (using logical coordinates)
-    let fits_right = cursor_pos.x + panel_logical_size.x <= visible_right;
-    let fits_below = cursor_pos.y + panel_logical_size.y <= visible_bottom;
-
-    // println!("  Fits right: {}, fits below: {}", fits_right, fits_below);
-
-    // Determine panel position based on available space (using logical coordinates)
-    let panel_x = if fits_right {
-        cursor_pos.x // Top-left or bottom-left at cursor
-    } else {
-        cursor_pos.x - panel_logical_size.x // Top-right or bottom-right at cursor
-    };
-
-    let panel_y = if fits_below {
-        cursor_pos.y // Top-left or top-right at cursor
-    } else {
-        cursor_pos.y - panel_logical_size.y // Bottom-left or bottom-right at cursor
-    };
-
-    // Ensure the panel stays within visible area bounds (safety clamp, using logical coordinates)
-    let final_x = panel_x
-        .max(visible_left)
-        .min(visible_right - panel_logical_size.x);
-    let final_y = panel_y
-        .max(visible_top)
-        .min(visible_bottom - panel_logical_size.y);
-
-    // Convert back to physical coordinates for Tauri API
-    let physical_x = (final_x * scale_factor) as i32;
-    let physical_y = (final_y * scale_factor) as i32;
-
-    // Set panel position using Tauri API
-    let position = Position::Physical(PhysicalPosition {
-        x: physical_x,
-        y: physical_y,
-    });
-
-    window
-        .set_position(position)
-        .map_err(|_| PositioningError::WindowHandleError)?;
-
-    Ok(())
-}
-
-/// Get current cursor position in screen coordinates
-fn get_cursor_position() -> Result<PhysicalPosition<f64>, PositioningError> {
-    // Use Cocoa APIs to get cursor position
-    #[cfg(target_os = "macos")]
-    {
-        use cocoa::appkit::{NSEvent, NSScreen};
+    if let Ok(native_window) = window.ns_window() {
         use cocoa::foundation::NSPoint;
+        use objc::{msg_send, sel, sel_impl};
 
+        let ns_window = native_window as id;
+
+        // Get cursor position and window/screen info (unsafe Cocoa calls)
+        let (raw_mouse_location, window_width, window_height, screen_visible_frame) = unsafe {
+            let raw_mouse_location: NSPoint =
+                cocoa::appkit::NSEvent::mouseLocation(std::ptr::null_mut());
+
+            let window_frame: cocoa::foundation::NSRect = msg_send![ns_window, frame];
+            let window_width = window_frame.size.width;
+            let window_height = window_frame.size.height;
+
+            let main_screen = cocoa::appkit::NSScreen::mainScreen(std::ptr::null_mut());
+            let screen_visible_frame = cocoa::appkit::NSScreen::visibleFrame(main_screen);
+
+            (
+                raw_mouse_location,
+                window_width,
+                window_height,
+                screen_visible_frame,
+            )
+        };
+
+        // Calculate positioning (safe calculations)
+        let desired_x = raw_mouse_location.x;
+        let desired_y = raw_mouse_location.y - window_height;
+
+        // Check bounds and adjust if necessary (keep window on visible screen)
+        let final_x = desired_x
+            .max(screen_visible_frame.origin.x) // Don't go left of visible area
+            .min(screen_visible_frame.origin.x + screen_visible_frame.size.width - window_width); // Don't go right of visible area
+
+        let final_y = desired_y
+            .max(screen_visible_frame.origin.y) // Don't go below visible area
+            .min(screen_visible_frame.origin.y + screen_visible_frame.size.height - window_height); // Don't go above visible area
+
+        let cocoa_point = NSPoint {
+            x: final_x,
+            y: final_y,
+        };
+
+        // Apply positioning (unsafe Cocoa call)
         unsafe {
-            let mouse_location: NSPoint = NSEvent::mouseLocation(std::ptr::null_mut());
-
-            // Get the main screen to understand coordinate system
-            let main_screen = NSScreen::mainScreen(std::ptr::null_mut());
-            let main_screen_frame = NSScreen::frame(main_screen);
-
-            // Cocoa uses bottom-left origin, but we want top-left origin
-            // Convert from Cocoa coordinates to screen coordinates
-            let screen_y = main_screen_frame.size.height - mouse_location.y;
-
-            Ok(PhysicalPosition {
-                x: mouse_location.x,
-                y: screen_y,
-            })
+            let _: () = msg_send![ns_window, setFrameOrigin: cocoa_point];
         }
-    }
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        // For non-macOS platforms, we'd need different implementation
-        Err(PositioningError::MonitorNotFound)
+        Ok(())
+    } else {
+        println!("Failed to get native window for macOS positioning");
+        Err(PositioningError::WindowHandleError)
     }
 }
 
@@ -342,12 +181,135 @@ pub fn restore_previous_app() {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
-pub fn store_previous_app() {
-    // No-op for non-macOS platforms
-}
+// Non-macOS positioning
+// Not tested, partially implemented, so commented for the great future
 
-#[cfg(not(target_os = "macos"))]
-pub fn restore_previous_app() {
-    // No-op for non-macOS platforms
-}
+// // Simple rect structure for non-macOS platforms
+// #[cfg(not(target_os = "macos"))]
+// #[derive(Debug, Clone, Copy)]
+// struct SimpleRect {
+//     x: f64,
+//     y: f64,
+//     width: f64,
+//     height: f64,
+// }
+
+// // Trait to unify rect access across platforms
+// #[cfg(not(target_os = "macos"))]
+// impl RectAccess for SimpleRect {
+//     fn left(&self) -> f64 {
+//         self.x
+//     }
+//     fn top(&self) -> f64 {
+//         self.y
+//     }
+//     fn width(&self) -> f64 {
+//         self.width
+//     }
+//     fn height(&self) -> f64 {
+//         self.height
+//     }
+// }
+
+// #[cfg(not(target_os = "macos"))]
+// fn get_visible_screen_area() -> Result<(SimpleRect, f64), PositioningError> {
+//     // Fallback to monitor API for non-macOS
+//     let monitor = get_monitor_with_cursor().ok_or(PositioningError::MonitorNotFound)?;
+//     let monitor_scale_factor = monitor.scale_factor();
+//     let monitor_size = monitor.size().to_logical::<f64>(monitor_scale_factor);
+//     let monitor_position = monitor.position().to_logical::<f64>(monitor_scale_factor);
+
+//     let rect = SimpleRect {
+//         x: monitor_position.x,
+//         y: monitor_position.y,
+//         width: monitor_size.width,
+//         height: monitor_size.height,
+//     };
+//     Ok((rect, monitor_scale_factor))
+// }
+
+// #[cfg(not(target_os = "macos"))]
+// pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), PositioningError> {
+//     {
+//         // Fallback to Tauri positioning (for non-macOS)
+//         // Get cursor position in screen coordinates
+
+//         // TODO: Implement this
+//         Err(PositioningError::MonitorNotFound);
+//         // let cursor_pos = get_cursor_position()?;
+
+//         // Get panel size using Tauri API
+//         let panel_size = window
+//             .outer_size()
+//             .map_err(|_| PositioningError::WindowHandleError)?;
+
+//         // Get visible screen area (excluding dock and menu bar) for the screen with cursor
+//         let (visible_area, scale_factor) = get_visible_screen_area()?;
+
+//         // Convert panel size to logical pixels to match cursor coordinates
+//         let panel_logical_size = PhysicalPosition {
+//             x: panel_size.width as f64 / scale_factor,
+//             y: panel_size.height as f64 / scale_factor,
+//         };
+
+//         // Calculate visible area bounds in logical coordinates (to match cursor)
+//         let visible_left = visible_area.left();
+//         let visible_top = visible_area.top();
+//         let visible_right = visible_left + visible_area.width();
+//         let visible_bottom = visible_top + visible_area.height();
+
+//         // Calculate if panel fits in each direction from cursor (using logical coordinates)
+//         let fits_right = cursor_pos.x + panel_logical_size.x <= visible_right;
+//         let fits_below = cursor_pos.y + panel_logical_size.y <= visible_bottom;
+
+//         // Determine panel position based on available space (using logical coordinates)
+//         let panel_x = if fits_right {
+//             cursor_pos.x // Top-left or bottom-left at cursor
+//         } else {
+//             cursor_pos.x - panel_logical_size.x // Top-right or bottom-right at cursor
+//         };
+
+//         let panel_y = if fits_below {
+//             cursor_pos.y // Top-left or top-right at cursor
+//         } else {
+//             cursor_pos.y - panel_logical_size.y // Bottom-left or bottom-right at cursor
+//         };
+
+//         // Ensure the panel stays within visible area bounds (safety clamp, using logical coordinates)
+//         let final_x = panel_x
+//             .max(visible_left)
+//             .min(visible_right - panel_logical_size.x);
+//         let final_y = panel_y
+//             .max(visible_top)
+//             .min(visible_bottom - panel_logical_size.y);
+
+//         // Convert back to physical coordinates for Tauri API
+//         let physical_x = (final_x * scale_factor) as i32;
+//         let physical_y = (final_y * scale_factor) as i32;
+
+//         // Set panel position using Tauri API
+//         let position = Position::Physical(PhysicalPosition {
+//             x: physical_x,
+//             y: physical_y,
+//         });
+
+//         window
+//             .set_position(position)
+//             .map_err(|_| PositioningError::WindowHandleError)?;
+
+//         Ok(())
+//     }
+// }
+
+// #[cfg(not(target_os = "macos"))]
+// pub fn store_previous_app() {
+//     // No-op for non-macOS platforms
+// }
+
+// #[cfg(not(target_os = "macos"))]
+// pub fn restore_previous_app() {
+//     // No-op for non-macOS platforms
+// }
+
+// #[cfg(not(target_os = "macos"))]
+// use monitor::get_monitor_with_cursor;
