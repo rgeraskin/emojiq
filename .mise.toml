@@ -1,0 +1,5 @@
+[tasks."dev"]
+run = "pnpm run tauri dev"
+
+[tasks."build"]
+run = "pnpm run tauri build -b app"
