@@ -93,14 +93,7 @@ fn test_emoji_manager_initialization() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
 
-    let manager = EmojiManager::new(
-        emoji_file.clone(),
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
+    let manager = EmojiManager::new(emoji_file.clone(), ranks_file.clone());
 
     assert_eq!(manager.emoji_file_path, emoji_file);
     assert!(manager
@@ -121,7 +114,7 @@ fn test_load_emojis() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, _) = setup_test_files(&temp_dir);
 
-    let manager = EmojiManager::new(emoji_file, "test_ranks.json".to_string());
+    let manager = EmojiManager::new(emoji_file, temp_dir.path().join("test_ranks.json"));
     manager.load_emojis().unwrap();
 
     let data = manager.data.read().unwrap();
@@ -139,18 +132,7 @@ fn test_load_ranks() {
     let temp_dir = TempDir::new().unwrap();
     let (_, ranks_file) = setup_test_files(&temp_dir);
 
-    let manager = EmojiManager::new(
-        PathBuf::from("nonexistent.json"),
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
-
-    // Manually set the ranks file path for testing
-    let mut manager = manager;
-    manager.ranks_file_path = ranks_file;
+    let manager = EmojiManager::new(PathBuf::from("nonexistent.json"), ranks_file.clone());
 
     manager.load_ranks().unwrap();
 
@@ -168,7 +150,7 @@ fn test_build_keywords() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, _) = setup_test_files(&temp_dir);
 
-    let manager = EmojiManager::new(emoji_file, "test_ranks.json".to_string());
+    let manager = EmojiManager::new(emoji_file, temp_dir.path().join("test_ranks.json"));
     manager.build_keywords().unwrap();
 
     let data = manager.data.read().unwrap();
@@ -188,7 +170,7 @@ fn test_build_index() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, _) = setup_test_files(&temp_dir);
 
-    let manager = EmojiManager::new(emoji_file, "test_ranks.json".to_string());
+    let manager = EmojiManager::new(emoji_file, temp_dir.path().join("test_ranks.json"));
     manager.build_keywords().unwrap(); // Keywords must be built first
     manager.build_index().unwrap();
 
@@ -210,14 +192,7 @@ fn test_get_emojis_empty_filter() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
 
-    let mut manager = EmojiManager::new(
-        emoji_file,
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
+    let mut manager = EmojiManager::new(emoji_file, ranks_file.clone());
     manager.ranks_file_path = ranks_file;
 
     // Initialize the manager
@@ -246,14 +221,7 @@ fn test_get_emojis_with_filter() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
 
-    let mut manager = EmojiManager::new(
-        emoji_file,
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
+    let mut manager = EmojiManager::new(emoji_file, ranks_file.clone());
     manager.ranks_file_path = ranks_file;
 
     // Initialize the manager
@@ -274,7 +242,7 @@ fn test_get_keywords() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, _) = setup_test_files(&temp_dir);
 
-    let manager = EmojiManager::new(emoji_file, "test_ranks.json".to_string());
+    let manager = EmojiManager::new(emoji_file, temp_dir.path().join("test_ranks.json"));
     manager.build_keywords().unwrap();
 
     let keywords = manager.get_keywords("😀").unwrap();
@@ -290,7 +258,7 @@ fn test_get_keywords_nonexistent_emoji() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, _) = setup_test_files(&temp_dir);
 
-    let manager = EmojiManager::new(emoji_file, "test_ranks.json".to_string());
+    let manager = EmojiManager::new(emoji_file, temp_dir.path().join("test_ranks.json"));
     manager.build_keywords().unwrap();
 
     let keywords = manager.get_keywords("🏴‍☠️🦄").unwrap();
@@ -302,15 +270,7 @@ fn test_increment_usage() {
     let temp_dir = TempDir::new().unwrap();
     let (_, ranks_file) = setup_test_files(&temp_dir);
 
-    let mut manager = EmojiManager::new(
-        PathBuf::from("nonexistent.json"),
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
-    manager.ranks_file_path = ranks_file.clone();
+    let manager = EmojiManager::new(PathBuf::from("nonexistent.json"), ranks_file.clone());
 
     // Load initial ranks
     manager.load_ranks().unwrap();
@@ -338,15 +298,7 @@ fn test_increment_usage_new_emoji() {
     let temp_dir = TempDir::new().unwrap();
     let (_, ranks_file) = setup_test_files(&temp_dir);
 
-    let mut manager = EmojiManager::new(
-        PathBuf::from("nonexistent.json"),
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
-    manager.ranks_file_path = ranks_file;
+    let manager = EmojiManager::new(PathBuf::from("nonexistent.json"), ranks_file);
 
     // Increment usage for emoji not in ranks
     manager.increment_usage("🚀").unwrap();
@@ -368,15 +320,7 @@ fn test_public_api_functions() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
 
-    let mut manager = EmojiManager::new(
-        emoji_file,
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
-    manager.ranks_file_path = ranks_file;
+    let manager = EmojiManager::new(emoji_file, ranks_file);
 
     // Initialize the manager
     manager.load_emojis().unwrap();
@@ -384,10 +328,10 @@ fn test_public_api_functions() {
     manager.build_keywords().unwrap();
     manager.build_index().unwrap();
 
-    // Test the public API functions with the manager instance
-    let _result = emojiq_lib::emoji_manager::get_emojis(&manager, "");
-    let _result = emojiq_lib::emoji_manager::get_keywords(&manager, "😀");
-    let _result = emojiq_lib::emoji_manager::increment_usage(&manager, "😀");
+    // Test the public API functions with the manager instance (using new direct method calls)
+    let _result = manager.get_emojis("");
+    let _result = manager.get_keywords("😀");
+    let _result = manager.increment_usage("😀");
 
     // Just test that the functions can be called without panicking
     assert!(true);
@@ -398,15 +342,7 @@ fn test_optimized_search_performance() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
 
-    let mut manager = EmojiManager::new(
-        emoji_file,
-        ranks_file
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string(),
-    );
-    manager.ranks_file_path = ranks_file;
+    let manager = EmojiManager::new(emoji_file, ranks_file);
 
     // Initialize the manager
     manager.load_emojis().unwrap();

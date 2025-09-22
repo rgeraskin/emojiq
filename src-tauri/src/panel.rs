@@ -4,6 +4,7 @@
 )]
 
 use crate::constants::*;
+use crate::errors::EmojiError;
 use crate::positioning::{position_window_at_cursor, restore_previous_app, store_previous_app};
 use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_nspanel::{tauri_panel, CollectionBehavior, ManagerExt, StyleMask, WebviewWindowExt};
@@ -51,7 +52,7 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     // Ensures the panel cannot activate the App
     // panel.set_style_mask(NSWindowStyleMaskNonActivatingPanel); // should be adapted but why?
 
-    // Create and attach event handler
+    // Create and attach event handler (panel retains the handler internally)
     let handler = MiniPanelEventHandler::new();
 
     // Handle focus loss - hide panel and restore nonactivating_panel style
@@ -73,7 +74,7 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
 pub fn hide_panel(handle: AppHandle) -> Result<(), String> {
     let panel = handle
         .get_webview_panel("main")
-        .map_err(|e| format!("Failed to get main panel: {:?}", e))?;
+        .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)).to_string())?;
 
     if panel.is_visible() {
         println!("Panel is visible, hiding panel via command");
@@ -102,9 +103,9 @@ pub fn show_panel(handle: AppHandle) -> Result<(), String> {
         }
 
         // Show panel after positioning is complete
-        let panel = handle
-            .get_webview_panel("main")
-            .map_err(|e| format!("Failed to get main panel: {:?}", e))?;
+        let panel = handle.get_webview_panel("main").map_err(|e| {
+            EmojiError::Panel(format!("Failed to get main panel: {:?}", e)).to_string()
+        })?;
         panel.show_and_make_key();
 
         // Debug focus state
@@ -115,14 +116,14 @@ pub fn show_panel(handle: AppHandle) -> Result<(), String> {
 
         Ok(())
     } else {
-        Err("Failed to get main window".to_string())
+        Err(EmojiError::Panel("Failed to get main window".to_string()).to_string())
     }
 }
 
 pub fn toggle_panel(handle: AppHandle) -> Result<(), String> {
     let panel = handle
         .get_webview_panel("main")
-        .map_err(|e| format!("Failed to get main panel: {:?}", e))?;
+        .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)).to_string())?;
 
     if panel.is_visible() {
         let _ = hide_panel(handle);

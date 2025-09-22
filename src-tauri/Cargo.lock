@@ -350,25 +350,9 @@ checksum = "f6140449f97a6e97f9511815c5632d84c8aacf8ac271ad77c559218161a1373c"
 dependencies = [
  "bitflags 1.3.2",
  "block",
- "cocoa-foundation 0.1.2",
+ "cocoa-foundation",
  "core-foundation 0.9.4",
  "core-graphics 0.23.2",
- "foreign-types",
- "libc",
- "objc",
-]
-
-[[package]]
-name = "cocoa"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad36507aeb7e16159dfe68db81ccc27571c3ccd4b76fb2fb72fc59e7a4b1b64c"
-dependencies = [
- "bitflags 2.9.4",
- "block",
- "cocoa-foundation 0.2.1",
- "core-foundation 0.10.1",
- "core-graphics 0.24.0",
  "foreign-types",
  "libc",
  "objc",
@@ -385,19 +369,6 @@ dependencies = [
  "core-foundation 0.9.4",
  "core-graphics-types 0.1.3",
  "libc",
- "objc",
-]
-
-[[package]]
-name = "cocoa-foundation"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81411967c50ee9a1fc11365f8c585f863a22a9697c89239c452292c40ba79b0d"
-dependencies = [
- "bitflags 2.9.4",
- "block",
- "core-foundation 0.10.1",
- "core-graphics-types 0.2.0",
  "objc",
 ]
 
@@ -814,13 +785,12 @@ checksum = "4ef6b89e5b37196644d8796de5268852ff179b44e96276cf4290264843743bb7"
 name = "emojiq"
 version = "0.1.0"
 dependencies = [
- "cocoa 0.25.0",
+ "cocoa",
  "dirs 5.0.1",
  "dispatch",
  "enigo",
  "lazy_static",
  "libc",
- "monitor",
  "objc",
  "once_cell",
  "serde",
@@ -831,6 +801,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-macos-permissions",
  "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2006,20 +1977,6 @@ dependencies = [
  "libc",
  "wasi 0.11.1+wasi-snapshot-preview1",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "monitor"
-version = "0.1.0"
-source = "git+https://github.com/ahkohd/tauri-toolkit?branch=v2#36cf8ad53a8d91a3ac3103b7dcb8a3b4f778f807"
-dependencies = [
- "cocoa 0.26.1",
- "core-foundation 0.10.1",
- "core-graphics 0.24.0",
- "objc",
- "serde",
- "tauri",
- "thiserror 2.0.16",
 ]
 
 [[package]]

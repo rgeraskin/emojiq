@@ -1,9 +1,13 @@
 use crate::constants::*;
+use crate::errors::{EmojiError, LockResultExt};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, Once, RwLock};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex, RwLock,
+};
 use std::thread;
 use std::time::Instant;
 
@@ -46,23 +50,24 @@ pub struct EmojiManager {
     pending_writes: Arc<Mutex<bool>>,
     last_write_time: Arc<Mutex<Instant>>,
     write_delay: std::time::Duration,
+    write_worker_active: Arc<std::sync::atomic::AtomicBool>,
 
-    // Initialization synchronization
-    init_once: Once,
+    // Initialization synchronization (retryable)
+    init_lock: Mutex<()>,
+    init_success: AtomicBool,
 }
 
 impl Default for EmojiManager {
     fn default() -> Self {
-        Self::new(DEFAULT_EMOJI_FILE.into(), DEFAULT_RANKS_FILE.to_string())
+        let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let ranks_file_path = home_dir.join(DEFAULT_RANKS_FILE);
+        Self::new(DEFAULT_EMOJI_FILE.into(), ranks_file_path)
     }
 }
 
 impl EmojiManager {
-    /// Create a new EmojiManager with custom file paths
-    pub fn new(emoji_file_path: PathBuf, ranks_file_name: String) -> Self {
-        let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        let ranks_file_path = home_dir.join(ranks_file_name);
-
+    /// Create a new EmojiManager with explicit file paths
+    pub fn new(emoji_file_path: PathBuf, ranks_file_path: PathBuf) -> Self {
         Self {
             emoji_file_path,
             ranks_file_path,
@@ -70,55 +75,40 @@ impl EmojiManager {
             pending_writes: Arc::new(Mutex::new(false)),
             last_write_time: Arc::new(Mutex::new(Instant::now())),
             write_delay: write_delay(),
-            init_once: Once::new(),
+            write_worker_active: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            init_lock: Mutex::new(()),
+            init_success: AtomicBool::new(false),
         }
     }
 
-    /// Initialize all data structures at startup
-    pub fn initialize(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut init_result = Ok(());
+    /// Initialize all data structures at startup (retryable on failure)
+    pub fn initialize(&self) -> Result<(), EmojiError> {
+        if self.init_success.load(Ordering::Acquire) {
+            return Ok(());
+        }
 
-        self.init_once.call_once(|| {
-            println!("Initializing emoji manager...");
+        let _guard = self.init_lock.lock().map_lock_err()?;
+        if self.init_success.load(Ordering::Acquire) {
+            return Ok(());
+        }
 
-            // Load emojis first
-            if let Err(e) = self.load_emojis() {
-                init_result = Err(e);
-                return;
-            }
+        println!("Initializing emoji manager...");
 
-            // Load ranks
-            if let Err(e) = self.load_ranks() {
-                init_result = Err(e);
-                return;
-            }
+        self.load_emojis()?;
+        self.load_ranks()?;
+        self.build_keywords()?;
+        self.build_index()?;
 
-            // Build keywords
-            if let Err(e) = self.build_keywords() {
-                init_result = Err(e);
-                return;
-            }
-
-            // Build search index
-            if let Err(e) = self.build_index() {
-                init_result = Err(e);
-                return;
-            }
-
-            println!("Emoji manager initialized successfully");
-        });
-
-        init_result
+        self.init_success.store(true, Ordering::Release);
+        println!("Emoji manager initialized successfully");
+        Ok(())
     }
 
     /// Load emoji data from JSON file
-    pub fn load_emojis(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn load_emojis(&self) -> Result<(), EmojiError> {
         // Check if already loaded (read lock is cheaper)
         {
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for emoji data")?;
+            let data = self.data.read().map_lock_err()?;
             if data.emojis_loaded {
                 return Ok(());
             }
@@ -143,10 +133,7 @@ impl EmojiManager {
 
         // Update with write lock
         {
-            let mut data = self
-                .data
-                .write()
-                .map_err(|_| "Failed to acquire write lock for emoji data")?;
+            let mut data = self.data.write().map_lock_err()?;
             data.emojis = emoji_data;
             data.emojis_loaded = true;
             println!("Loaded {} emojis", data.emojis.len());
@@ -156,13 +143,10 @@ impl EmojiManager {
     }
 
     /// Load usage ranks from file
-    pub fn load_ranks(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn load_ranks(&self) -> Result<(), EmojiError> {
         // Check if already loaded (read lock is cheaper)
         {
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for ranks data")?;
+            let data = self.data.read().map_lock_err()?;
             if data.ranks_loaded {
                 return Ok(());
             }
@@ -177,10 +161,7 @@ impl EmojiManager {
 
         // Update with write lock
         {
-            let mut data = self
-                .data
-                .write()
-                .map_err(|_| "Failed to acquire write lock for ranks data")?;
+            let mut data = self.data.write().map_lock_err()?;
             data.ranks = ranks_data;
             data.ranks_loaded = true;
             println!("Loaded {} ranks", data.ranks.len());
@@ -190,13 +171,10 @@ impl EmojiManager {
     }
 
     /// Build keyword mappings
-    pub fn build_keywords(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn build_keywords(&self) -> Result<(), EmojiError> {
         // Check if already built (read lock is cheaper)
         {
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for keywords data")?;
+            let data = self.data.read().map_lock_err()?;
             if data.keywords_built {
                 println!("Keywords already built, skipping");
                 return Ok(());
@@ -209,10 +187,7 @@ impl EmojiManager {
 
         // Build keywords with read lock
         {
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for emoji data")?;
+            let data = self.data.read().map_lock_err()?;
 
             for emoji_data in data.emojis.iter() {
                 let emoji = &emoji_data.emoji;
@@ -257,10 +232,7 @@ impl EmojiManager {
 
         // Update with write lock
         {
-            let mut data = self
-                .data
-                .write()
-                .map_err(|_| "Failed to acquire write lock for keywords data")?;
+            let mut data = self.data.write().map_lock_err()?;
             data.keywords = keywords_map;
             data.keywords_built = true;
             println!("Built keywords for {} emojis", data.keywords.len());
@@ -270,13 +242,10 @@ impl EmojiManager {
     }
 
     /// Build search index
-    pub fn build_index(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn build_index(&self) -> Result<(), EmojiError> {
         // Check if already built (read lock is cheaper)
         {
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for index data")?;
+            let data = self.data.read().map_lock_err()?;
             if data.index_built {
                 println!("Index already built, skipping");
                 return Ok(());
@@ -302,7 +271,8 @@ impl EmojiManager {
 
                     // Index prefixes for partial matching (min length MIN_KEYWORD_LENGTH)
                     let chars: Vec<char> = keyword.chars().collect();
-                    for i in MIN_KEYWORD_LENGTH..=chars.len() {
+                    let cap = MAX_PREFIX_LENGTH.min(chars.len());
+                    for i in MIN_KEYWORD_LENGTH..=cap {
                         let prefix: String = chars[..i].iter().collect();
                         index.entry(prefix).or_insert_with(Vec::new).push(emoji_idx);
                     }
@@ -311,10 +281,7 @@ impl EmojiManager {
 
         // Build inverted index: keyword -> vec of emoji indices (with read lock)
         {
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for keywords data")?;
+            let data = self.data.read().map_lock_err()?;
 
             for (emoji_idx, emoji_data) in data.emojis.iter().enumerate() {
                 let emoji = &emoji_data.emoji;
@@ -345,10 +312,7 @@ impl EmojiManager {
 
         // Update with write lock
         {
-            let mut data = self
-                .data
-                .write()
-                .map_err(|_| "Failed to acquire write lock for index data")?;
+            let mut data = self.data.write().map_lock_err()?;
             data.index = index_map;
             data.index_built = true;
             println!("Built index for {} matches", data.index.len());
@@ -428,12 +392,22 @@ impl EmojiManager {
             }
         }
 
+        // Only spawn a worker if one is not already active
+        if self
+            .write_worker_active
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Relaxed)
+            .is_err()
+        {
+            return; // writer already active; it will pick up the updated timestamp
+        }
+
         // Clone necessary data for the async task
         let pending_writes = Arc::clone(&self.pending_writes);
         let last_write_time = Arc::clone(&self.last_write_time);
         let data = Arc::clone(&self.data);
         let ranks_file_path = self.ranks_file_path.clone();
         let write_delay = self.write_delay;
+        let write_worker_active = Arc::clone(&self.write_worker_active);
 
         // Schedule write in separate thread
         thread::spawn(move || {
@@ -463,6 +437,7 @@ impl EmojiManager {
                         Ok(data) => data.ranks.clone(),
                         Err(_) => {
                             eprintln!("Failed to acquire read lock for ranks during write");
+                            write_worker_active.store(false, Ordering::Release);
                             return;
                         }
                     }
@@ -484,21 +459,20 @@ impl EmojiManager {
                     }
                 }
             }
+            // Mark worker inactive regardless of outcome to allow future scheduling
+            write_worker_active.store(false, Ordering::Release);
         });
     }
 
     /// Get filtered emojis as array with optimized memory usage and result limits
-    pub fn get_emojis(&self, filter_word: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    pub fn get_emojis(&self, filter_word: &str) -> Result<Vec<String>, EmojiError> {
         println!("get_emojis called with filter: '{}'", filter_word);
         let filter_word = filter_word.trim().to_lowercase();
 
         let emoji_list: Vec<String> = if filter_word.len() < MIN_SEARCH_LENGTH {
             println!("Getting all emojis (filter too short)");
             // Return all emojis when filter is too short, limited by MAX_SEARCH_RESULTS to avoid overwhelming UI
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for emoji data")?;
+            let data = self.data.read().map_lock_err()?;
 
             data.emojis
                 .iter()
@@ -508,10 +482,7 @@ impl EmojiManager {
         } else {
             println!("Getting emojis for filter word: '{}'", filter_word);
             // Index is already built at startup, now using emoji indices
-            let data = self
-                .data
-                .read()
-                .map_err(|_| "Failed to acquire read lock for index data")?;
+            let data = self.data.read().map_lock_err()?;
 
             if let Some(emoji_indices) = data.index.get(&filter_word) {
                 emoji_indices
@@ -533,12 +504,9 @@ impl EmojiManager {
     }
 
     /// Get keywords for an emoji as array
-    pub fn get_keywords(&self, emoji: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    pub fn get_keywords(&self, emoji: &str) -> Result<Vec<String>, EmojiError> {
         // Keywords are already built at startup
-        let data = self
-            .data
-            .read()
-            .map_err(|_| "Failed to acquire read lock for keywords data")?;
+        let data = self.data.read().map_lock_err()?;
 
         // Clone the Arc contents to maintain API compatibility while being more efficient internally
         let emoji_keywords = data
@@ -550,15 +518,12 @@ impl EmojiManager {
     }
 
     /// Increment usage count for an emoji
-    pub fn increment_usage(&self, emoji: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn increment_usage(&self, emoji: &str) -> Result<(), EmojiError> {
         println!("Incrementing usage for emoji: '{}'", emoji);
 
         // Ranks are already loaded at startup
         {
-            let mut data = self
-                .data
-                .write()
-                .map_err(|_| "Failed to acquire write lock for ranks data")?;
+            let mut data = self.data.write().map_lock_err()?;
             let count = data.ranks.entry(emoji.to_string()).or_insert(0);
             *count += 1;
         }
@@ -568,20 +533,4 @@ impl EmojiManager {
 
         Ok(())
     }
-}
-
-// Public API functions
-/// Get filtered emojis as array
-pub fn get_emojis(manager: &EmojiManager, filter_word: &str) -> Result<Vec<String>, String> {
-    manager.get_emojis(filter_word).map_err(|e| e.to_string())
-}
-
-/// Get keywords for an emoji as array
-pub fn get_keywords(manager: &EmojiManager, emoji: &str) -> Result<Vec<String>, String> {
-    manager.get_keywords(emoji).map_err(|e| e.to_string())
-}
-
-/// Increment usage count for an emoji
-pub fn increment_usage(manager: &EmojiManager, emoji: &str) -> Result<(), String> {
-    manager.increment_usage(emoji).map_err(|e| e.to_string())
 }

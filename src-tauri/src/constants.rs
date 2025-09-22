@@ -10,13 +10,14 @@ pub const MIN_SEARCH_LENGTH: usize = 2;
 pub const MAX_SEARCH_RESULTS: usize = 2000;
 pub const MAX_TOP_EMOJIS: usize = 10;
 pub const MIN_KEYWORD_LENGTH: usize = 2;
+pub const MAX_PREFIX_LENGTH: usize = 12; // Cap for prefix indexing to bound memory
 
 // UI constants
 pub const PANEL_CORNER_RADIUS: f64 = 12.0;
 
 // File constants
 pub const DEFAULT_EMOJI_FILE: &str = "src/emoji.json";
-pub const DEFAULT_RANKS_FILE: &str = ".emojiq_ranks.json";
+pub const DEFAULT_RANKS_FILE: &str = "ranks.json";
 
 // App metadata
 pub const APP_BUNDLE_IDENTIFIER: &str = "dev.rgeraskin.emojiq";

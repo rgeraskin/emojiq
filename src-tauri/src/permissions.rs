@@ -1,3 +1,4 @@
+use crate::errors::EmojiError;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri_plugin_macos_permissions::{
     check_accessibility_permission, request_accessibility_permission,
@@ -8,7 +9,7 @@ static PERMISSION_GRANTED: AtomicBool = AtomicBool::new(false);
 static PERMISSION_CHECKED: AtomicBool = AtomicBool::new(false);
 
 /// Check and cache accessibility permission status
-pub async fn ensure_accessibility_permission() -> Result<(), String> {
+pub async fn ensure_accessibility_permission() -> Result<(), EmojiError> {
     // If we've already checked and have permission, return early
     if PERMISSION_CHECKED.load(Ordering::Relaxed) && PERMISSION_GRANTED.load(Ordering::Relaxed) {
         return Ok(());
@@ -35,7 +36,7 @@ pub async fn ensure_accessibility_permission() -> Result<(), String> {
         if authorized_after_request {
             Ok(())
         } else {
-            Err("Accessibility permission denied. Please grant permission in System Preferences > Security & Privacy > Privacy > Accessibility".to_string())
+            Err(EmojiError::Permission("Accessibility permission denied. Please grant permission in System Preferences > Security & Privacy > Privacy > Accessibility".to_string()))
         }
     }
 }

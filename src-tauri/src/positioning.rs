@@ -1,4 +1,5 @@
 #![cfg_attr(target_os = "macos", allow(unexpected_cfgs))]
+use crate::errors::EmojiError;
 use std::sync::{Arc, Mutex};
 #[cfg(not(target_os = "macos"))]
 use tauri::{PhysicalPosition, Position};
@@ -16,22 +17,7 @@ use libc::pthread_main_np;
 #[cfg(target_os = "macos")]
 use objc::{class, msg_send, sel, sel_impl};
 
-#[derive(Debug)]
-pub enum PositioningError {
-    // MonitorNotFound,
-    WindowHandleError,
-}
-
-impl std::fmt::Display for PositioningError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            // PositioningError::MonitorNotFound => write!(f, "Monitor with cursor not found"),
-            PositioningError::WindowHandleError => write!(f, "Failed to get window handle"),
-        }
-    }
-}
-
-impl std::error::Error for PositioningError {}
+// PositioningError has been replaced with EmojiError for consistency
 
 // Global storage for the previously active application
 lazy_static::lazy_static! {
@@ -44,7 +30,7 @@ lazy_static::lazy_static! {
 /// macOS positioning
 /// I use Cocoa and Objective-C for this because, with the previous Tauri implementation, the panel would sometimes initially appear at its previous location before quickly moving to the new position.
 #[cfg(target_os = "macos")]
-pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), PositioningError> {
+pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), EmojiError> {
     if let Ok(native_window) = window.ns_window() {
         use cocoa::foundation::NSPoint;
         use objc::{msg_send, sel, sel_impl};
@@ -97,7 +83,7 @@ pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), Po
         Ok(())
     } else {
         println!("Failed to get native window for macOS positioning");
-        Err(PositioningError::WindowHandleError)
+        Err(EmojiError::WindowHandle)
     }
 }
 

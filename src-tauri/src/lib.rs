@@ -1,11 +1,13 @@
 mod command;
 mod constants;
 pub mod emoji_manager;
+mod errors;
 mod panel;
 mod permissions;
 mod positioning;
 mod tray;
 
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
@@ -47,8 +49,20 @@ pub fn run() {
                 }
             });
 
-            // Initialize emoji manager and add to app state
-            let emoji_manager = Arc::new(EmojiManager::default());
+            // Initialize emoji manager with ranks under Application Support
+            let ranks_file_path: PathBuf = {
+                let mut dir = app.path().app_data_dir()?;
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    println!("Failed to create Application Support directory: {}", e);
+                }
+                dir.push(constants::DEFAULT_RANKS_FILE);
+                dir
+            };
+
+            let emoji_manager = Arc::new(EmojiManager::new(
+                PathBuf::from(constants::DEFAULT_EMOJI_FILE),
+                ranks_file_path,
+            ));
             if let Err(e) = emoji_manager.initialize() {
                 println!("Warning: Failed to initialize emoji manager: {}", e);
             }
