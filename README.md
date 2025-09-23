@@ -19,7 +19,10 @@ Inspired by the excellent [qmoji](https://github.com/jaredly/qmoji) by Jared For
 
 ## Installation
 
-Homebrew cask coming soon.
+```bash
+brew tap rgeraskin/homebrew
+brew install --cask emojiq
+```
 
 EmojiQ requires accessibility permissions to paste emojis into other applications. On first launch, click "Open System Settings" in the dialog and enable "EmojiQ" in the list.
 
