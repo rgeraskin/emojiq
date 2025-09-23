@@ -1,6 +1,7 @@
 # EmojiQ
 
-A quick and elegant emoji picker desktop app for any text box.
+Frustrated with every app reinventing its own emoji picker? Replace them with EmojiQ.
+![logo](logo.png)
 
 EmojiQ provides a floating panel with instant access to emojis through a global hotkey, featuring smart search, keyboard navigation, and seamless pasting.
 
@@ -16,6 +17,8 @@ Inspired by the excellent [qmoji](https://github.com/jaredly/qmoji) by Jared For
 - 🎯 **Smart positioning**: The panel appears under the mouse cursor
 - 🎨 **Native design**: Built with the cross-platform [Tauri](https://tauri.app) framework
 - 📦 **Small footprint**: Low resource usage, thanks to Rust!
+
+![demo](demo.gif)
 
 ## Installation
 
@@ -56,6 +59,22 @@ It’s like qmoji, but with:
 - more emojis and more keywords
 - cross-platform by design (macOS supported today)
 - MIT licensed
+- alive and maintained :)
+
+## Roadmap
+
+Someday I might add:
+
+- [ ] Settings with options like:
+  - [ ] Number of recent emojis (currently hardcoded to 10)
+  - [ ] Clear recent emoji stats (currently requires deleting the file manually)
+  - [ ] Disable positioning under the mouse cursor
+  - [ ] Custom hotkey configuration
+  - [ ] Modes: Paste / Copy to clipboard / Paste & Copy to clipboard
+- [ ] Linux support
+- [ ] Windows support
+
+Suggest a feature [here](https://github.com/rgeraskin/emojiq/issues/new)!
 
 ## Technical Details
 
@@ -125,18 +144,6 @@ Contributions are welcome!
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
-
-## Roadmap
-
-Someday I might add:
-
-- [ ] Settings with options like:
-  - [ ] Number of recent emojis (currently hardcoded to 10)
-  - [ ] Clear recent emoji stats (currently requires deleting the file manually)
-  - [ ] Disable positioning under the mouse cursor
-  - [ ] Custom hotkey configuration
-- [ ] Linux support
-- [ ] Windows support
 
 ## License
 
