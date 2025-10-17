@@ -3,16 +3,37 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum EmojiMode {
+    /// Only paste emoji to last focused window on emoji select (requires accessibility permission)
+    PasteOnly,
+    /// Only copy emoji to clipboard on select (no accessibility permission required)
+    CopyOnly,
+    /// Both paste to last focused window and copy to clipboard (requires accessibility permission)
+    PasteAndCopy,
+}
+
+impl Default for EmojiMode {
+    fn default() -> Self {
+        Self::PasteOnly
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
     /// Whether to place the main panel under the mouse cursor when shown
     pub place_under_mouse: bool,
+    /// Emoji selection mode
+    #[serde(default)]
+    pub emoji_mode: EmojiMode,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             place_under_mouse: true,
+            emoji_mode: EmojiMode::default(),
         }
     }
 }

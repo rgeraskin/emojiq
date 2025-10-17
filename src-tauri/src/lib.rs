@@ -27,6 +27,7 @@ pub struct AppState {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_macos_permissions::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_nspanel::init())
         .invoke_handler(tauri::generate_handler![
             command::show_panel,
@@ -43,17 +44,6 @@ pub fn run() {
         .setup(|app| {
             // Set activation policy to Accessory to prevent the app icon from showing on the dock
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-
-            // Check accessibility permissions at startup
-            tauri::async_runtime::spawn(async {
-                match permissions::ensure_accessibility_permission().await {
-                    Ok(_) => (),
-                    Err(e) => {
-                        println!("⚠️  Accessibility permission issue: {}", e);
-                        println!("   App will work for browsing emojis, but pasting may not work until permission is granted.");
-                    }
-                }
-            });
 
             // Initialize emoji manager with ranks under Application Support
             let ranks_file_path: PathBuf = {
@@ -84,6 +74,24 @@ pub fn run() {
             if let Err(e) = settings_manager.initialize() {
                 println!("Warning: Failed to initialize settings manager: {}", e);
             }
+
+            // Check accessibility permissions at startup only if needed for the current mode
+            let settings_manager_clone = settings_manager.clone();
+            tauri::async_runtime::spawn(async move {
+                // Check if emoji mode requires accessibility permission
+                if let Ok(settings) = settings_manager_clone.get() {
+                    let needs_permission = settings.emoji_mode != settings::EmojiMode::CopyOnly;
+                    if needs_permission {
+                        match permissions::ensure_accessibility_permission().await {
+                            Ok(_) => (),
+                            Err(e) => {
+                                println!("⚠️  Accessibility permission issue: {}", e);
+                                println!("   App will work for browsing emojis, but pasting may not work until permission is granted.");
+                            }
+                        }
+                    }
+                }
+            });
 
             let app_state = AppState {
                 emoji_manager,

@@ -26,7 +26,39 @@
             </div>
         </div>
 
-        <div id="statusMessage" class="status-message"></div>
+        <div class="setting-group">
+            <div class="setting-item-full">
+                <div class="setting-label">Emoji selection mode</div>
+                <div class="setting-description">
+                    Choose how emojis are handled when selected
+                </div>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="emojiMode" value="paste_only" id="emojiModePasteOnly">
+                        <div class="radio-content">
+                            <div class="radio-label">Paste only</div>
+                            <div class="radio-description">Paste emoji to last focused window (requires accessibility
+                                permission for macOS)</div>
+                        </div>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="emojiMode" value="copy_only" id="emojiModeCopyOnly">
+                        <div class="radio-content">
+                            <div class="radio-label">Copy only</div>
+                            <div class="radio-description">Copy emoji to clipboard</div>
+                        </div>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="emojiMode" value="paste_and_copy" id="emojiModePasteAndCopy">
+                        <div class="radio-content">
+                            <div class="radio-label">Paste and copy</div>
+                            <div class="radio-description">Both paste to window and copy to clipboard (requires
+                                accessibility permission for macOS)</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
 
         <div class="footer">
             emojiq v0.1.0 © 2025 Roman Geraskin

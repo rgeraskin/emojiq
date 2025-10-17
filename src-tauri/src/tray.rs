@@ -39,7 +39,7 @@ pub fn open_settings_window(app: &AppHandle) -> tauri::Result<()> {
     // Create new settings window
     WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
         .title("Settings - emojiq")
-        .inner_size(500.0, 220.0)
+        .inner_size(500.0, 510.0)
         .resizable(false)
         .center()
         .build()?;

@@ -1,11 +1,12 @@
 use crate::constants::*;
 use crate::panel;
 use crate::permissions::{ensure_accessibility_permission, reset_permission_cache};
-use crate::settings::Settings as AppSettings;
+use crate::settings::{EmojiMode, Settings as AppSettings};
 use crate::tray;
 use crate::AppState;
 use enigo::{Enigo, Keyboard, Settings};
 use tauri::{AppHandle, State};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[tauri::command]
 pub fn show_panel(handle: AppHandle) -> Result<(), String> {
@@ -17,13 +18,16 @@ pub fn hide_panel(handle: AppHandle) -> Result<(), String> {
     panel::hide_panel(handle)
 }
 
-#[tauri::command]
-pub async fn type_emoji(_: AppHandle, emoji: String) -> Result<(), String> {
-    // Ensure accessibility permission is granted (uses caching)
-    ensure_accessibility_permission()
-        .await
-        .map_err(|e| e.to_string())?;
+/// Copy emoji to clipboard
+async fn copy_emoji(handle: &AppHandle, emoji: &str) -> Result<(), String> {
+    handle
+        .clipboard()
+        .write_text(emoji)
+        .map_err(|e| format!("Failed to copy emoji to clipboard: {}", e))
+}
 
+/// Paste emoji to the previously focused window
+async fn paste_emoji(emoji: &str) -> Result<(), String> {
     // Panel is already hidden and focus to the previously active application is being restored
     // Short delay to allow focus restoration to complete (offload blocking sleep)
     let delay = std::time::Duration::from_millis(FOCUS_RESTORATION_DELAY_MS);
@@ -32,10 +36,38 @@ pub async fn type_emoji(_: AppHandle, emoji: String) -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default())
         .map_err(|e| format!("Failed to initialize Enigo: {}", e))?;
 
-    // Write emoji text
     enigo
-        .text(&emoji)
-        .map_err(|e| format!("Failed to type emoji: {}", e))?;
+        .text(emoji)
+        .map_err(|e| format!("Failed to type emoji: {}", e))
+}
+
+#[tauri::command]
+pub async fn type_emoji(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+    emoji: String,
+) -> Result<(), String> {
+    // Get current settings to determine emoji mode
+    let settings = state.settings_manager.get().map_err(|e| e.to_string())?;
+
+    match settings.emoji_mode {
+        EmojiMode::PasteOnly => {
+            ensure_accessibility_permission()
+                .await
+                .map_err(|e| e.to_string())?;
+            paste_emoji(&emoji).await?;
+        }
+        EmojiMode::CopyOnly => {
+            copy_emoji(&handle, &emoji).await?;
+        }
+        EmojiMode::PasteAndCopy => {
+            ensure_accessibility_permission()
+                .await
+                .map_err(|e| e.to_string())?;
+            copy_emoji(&handle, &emoji).await?;
+            paste_emoji(&emoji).await?;
+        }
+    }
 
     Ok(())
 }

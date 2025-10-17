@@ -9,6 +9,7 @@
     "core:default",
     "core:window:allow-start-dragging",
     "core:window:deny-internal-toggle-maximize",
-    "macos-permissions:default"
+    "macos-permissions:default",
+    "clipboard-manager:allow-write-text"
   ]
 }

@@ -2,44 +2,62 @@ const { invoke } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
 
 const placeUnderMouseToggle = document.getElementById('placeUnderMouseToggle');
-const statusMessage = document.getElementById('statusMessage');
+const emojiModePasteOnly = document.getElementById('emojiModePasteOnly');
+const emojiModeCopyOnly = document.getElementById('emojiModeCopyOnly');
+const emojiModePasteAndCopy = document.getElementById('emojiModePasteAndCopy');
 
 // Load settings on page load
 async function loadSettings() {
   try {
     const settings = await invoke('get_settings');
     placeUnderMouseToggle.checked = settings.place_under_mouse;
+
+    // Set the appropriate radio button based on emoji_mode
+    const emojiMode = settings.emoji_mode || 'paste_only';
+    switch (emojiMode) {
+      case 'paste_only':
+        emojiModePasteOnly.checked = true;
+        break;
+      case 'copy_only':
+        emojiModeCopyOnly.checked = true;
+        break;
+      case 'paste_and_copy':
+        emojiModePasteAndCopy.checked = true;
+        break;
+      default:
+        emojiModePasteOnly.checked = true;
+    }
   } catch (error) {
     console.error('Failed to load settings:', error);
-    showStatus('Failed to load settings', 'error');
   }
+}
+
+// Get selected emoji mode
+function getSelectedEmojiMode() {
+  if (emojiModePasteOnly.checked) return 'paste_only';
+  if (emojiModeCopyOnly.checked) return 'copy_only';
+  if (emojiModePasteAndCopy.checked) return 'paste_and_copy';
+  return 'paste_only'; // default
 }
 
 // Save settings when changed
 async function saveSettings() {
   try {
     const settings = {
-      place_under_mouse: placeUnderMouseToggle.checked
+      place_under_mouse: placeUnderMouseToggle.checked,
+      emoji_mode: getSelectedEmojiMode()
     };
     await invoke('update_settings', { settings });
-    showStatus('Settings saved successfully', 'success');
   } catch (error) {
     console.error('Failed to save settings:', error);
-    showStatus('Failed to save settings', 'error');
   }
-}
-
-// Show status message
-function showStatus(message, type) {
-  statusMessage.textContent = message;
-  statusMessage.className = `status-message ${type} show`;
-  setTimeout(() => {
-    statusMessage.classList.remove('show');
-  }, 3000);
 }
 
 // Event listeners
 placeUnderMouseToggle.addEventListener('change', saveSettings);
+emojiModePasteOnly.addEventListener('change', saveSettings);
+emojiModeCopyOnly.addEventListener('change', saveSettings);
+emojiModePasteAndCopy.addEventListener('change', saveSettings);
 
 // ESC key to close settings window
 window.addEventListener('keydown', async (e) => {
