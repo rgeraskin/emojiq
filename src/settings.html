@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - emojiq</title>
+    <link rel="stylesheet" href="settings.css">
+    <script type="module" src="settings.js" defer></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="setting-group">
+            <div class="setting-item">
+                <div class="setting-info">
+                    <div class="setting-label">Place under mouse</div>
+                    <div class="setting-description">
+                        Position the emoji panel under your mouse cursor when opened
+                    </div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="placeUnderMouseToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <div class="footer">
+            emojiq v0.1.0 © 2025 Roman Geraskin
+        </div>
+    </div>
+</body>
+
+</html>

@@ -72,6 +72,13 @@ function setupEventListeners() {
       return;
     }
 
+    // Cmd+, to open settings
+    if (e.key === ',' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
+      e.preventDefault();
+      await invoke("open_settings");
+      return;
+    }
+
     // Focus search input when typing any character (but not special keys)
     const isTypingCharacter = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
     const isSearchFocused = document.activeElement === searchInput;

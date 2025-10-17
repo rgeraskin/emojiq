@@ -18,6 +18,7 @@ pub const PANEL_CORNER_RADIUS: f64 = 12.0;
 // File constants
 pub const DEFAULT_EMOJI_FILE: &str = "src/emoji.json";
 pub const DEFAULT_RANKS_FILE: &str = "ranks.json";
+pub const DEFAULT_SETTINGS_FILE: &str = "settings.json";
 
 // App metadata
 pub const APP_BUNDLE_IDENTIFIER: &str = "dev.rgeraskin.emojiq";

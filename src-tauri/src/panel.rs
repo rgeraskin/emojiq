@@ -94,12 +94,28 @@ pub fn show_panel(handle: AppHandle) -> Result<(), String> {
 
     // Get the window first, then convert to panel (more reliable)
     if let Some(window) = handle.get_webview_window("main") {
-        // Position panel BEFORE showing the panel
-        if let Err(e) = position_window_at_cursor(&window) {
-            println!(
-                "Warning: Failed to position panel at cursor: {}. Using default positioning.",
-                e
-            );
+        // Check settings to determine if we should position at cursor
+        let should_position_at_cursor = {
+            use tauri::Manager;
+            match handle.try_state::<crate::AppState>() {
+                Some(state) => state
+                    .settings_manager
+                    .get_place_under_mouse()
+                    .unwrap_or(true),
+                None => true, // Default to true if we can't get state
+            }
+        };
+
+        // Position panel BEFORE showing the panel (if enabled)
+        if should_position_at_cursor {
+            if let Err(e) = position_window_at_cursor(&window) {
+                println!(
+                    "Warning: Failed to position panel at cursor: {}. Using default positioning.",
+                    e
+                );
+            }
+        } else {
+            println!("Positioning at cursor disabled, using default positioning");
         }
 
         // Show panel after positioning is complete

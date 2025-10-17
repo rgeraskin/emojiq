@@ -5,6 +5,7 @@ mod errors;
 mod panel;
 mod permissions;
 mod positioning;
+mod settings;
 mod tray;
 
 use std::path::PathBuf;
@@ -13,11 +14,13 @@ use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 
 use crate::emoji_manager::EmojiManager;
+use crate::settings::SettingsManager;
 
 /// Application state containing shared resources
 #[derive(Debug)]
 pub struct AppState {
     pub emoji_manager: Arc<EmojiManager>,
+    pub settings_manager: Arc<SettingsManager>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -33,6 +36,9 @@ pub fn run() {
             command::get_emojis,
             command::get_keywords,
             command::increment_usage,
+            command::get_settings,
+            command::update_settings,
+            command::open_settings,
         ])
         .setup(|app| {
             // Set activation policy to Accessory to prevent the app icon from showing on the dock
@@ -67,7 +73,22 @@ pub fn run() {
                 println!("Warning: Failed to initialize emoji manager: {}", e);
             }
 
-            let app_state = AppState { emoji_manager };
+            // Initialize settings manager with settings file under Application Support
+            let settings_file_path: PathBuf = {
+                let mut dir = app.path().app_data_dir()?;
+                dir.push(constants::DEFAULT_SETTINGS_FILE);
+                dir
+            };
+
+            let settings_manager = Arc::new(SettingsManager::new(settings_file_path));
+            if let Err(e) = settings_manager.initialize() {
+                println!("Warning: Failed to initialize settings manager: {}", e);
+            }
+
+            let app_state = AppState {
+                emoji_manager,
+                settings_manager,
+            };
             app.manage(app_state);
 
             panel::init(app.app_handle())?;

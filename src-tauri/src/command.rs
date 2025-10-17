@@ -1,6 +1,8 @@
 use crate::constants::*;
 use crate::panel;
 use crate::permissions::{ensure_accessibility_permission, reset_permission_cache};
+use crate::settings::Settings as AppSettings;
+use crate::tray;
 use crate::AppState;
 use enigo::{Enigo, Keyboard, Settings};
 use tauri::{AppHandle, State};
@@ -66,6 +68,22 @@ pub fn increment_usage(state: State<AppState>, emoji: String) -> Result<(), Stri
         .emoji_manager
         .increment_usage(&emoji)
         .map_err(|e| e.to_string())
+}
+
+// Settings commands
+#[tauri::command]
+pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
+    state.settings_manager.get()
+}
+
+#[tauri::command]
+pub fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
+    state.settings_manager.update(settings)
+}
+
+#[tauri::command]
+pub fn open_settings(handle: AppHandle) -> Result<(), String> {
+    tray::open_settings_window(&handle).map_err(|e| e.to_string())
 }
 
 // #[tauri::command]
