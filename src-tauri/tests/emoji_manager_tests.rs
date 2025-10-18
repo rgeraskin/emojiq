@@ -201,7 +201,7 @@ fn test_get_emojis_empty_filter() {
     manager.build_keywords().unwrap();
     manager.build_index().unwrap();
 
-    let result = manager.get_emojis("").unwrap();
+    let result = manager.get_emojis("", 10).unwrap();
     let emojis = result;
 
     // Should return all emojis (limited by MAX_SEARCH_RESULTS)
@@ -230,7 +230,7 @@ fn test_get_emojis_with_filter() {
     manager.build_keywords().unwrap();
     manager.build_index().unwrap();
 
-    let result = manager.get_emojis("monkey").unwrap();
+    let result = manager.get_emojis("monkey", 10).unwrap();
 
     // Should find monkey emojis
     assert!(result.contains(&"🐒".to_string()));
@@ -329,7 +329,7 @@ fn test_public_api_functions() {
     manager.build_index().unwrap();
 
     // Test the public API functions with the manager instance (using new direct method calls)
-    let _result = manager.get_emojis("");
+    let _result = manager.get_emojis("", 10);
     let _result = manager.get_keywords("😀");
     let _result = manager.increment_usage("😀");
 
@@ -351,10 +351,33 @@ fn test_optimized_search_performance() {
     manager.build_index().unwrap();
 
     // Test that short filters return all emojis (limited by MAX_SEARCH_RESULTS)
-    let result = manager.get_emojis("a").unwrap(); // Short filter
+    let result = manager.get_emojis("a", 10).unwrap(); // Short filter
     assert_eq!(result.len(), 5); // Should return all 5 test emojis
 
     // Test that search results are limited
-    let result = manager.get_emojis("an").unwrap(); // Longer filter
+    let result = manager.get_emojis("an", 10).unwrap(); // Longer filter
     assert!(result.len() <= 50); // Should be limited by MAX_SEARCH_RESULTS
+}
+
+#[test]
+fn test_get_emojis_with_zero_max_top() {
+    let temp_dir = TempDir::new().unwrap();
+    let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
+
+    let manager = EmojiManager::new(emoji_file, ranks_file);
+
+    // Initialize the manager
+    manager.load_emojis().unwrap();
+    manager.load_ranks().unwrap();
+    manager.build_keywords().unwrap();
+    manager.build_index().unwrap();
+
+    // Test with max_top_emojis = 0 (should skip ordering)
+    let result = manager.get_emojis("", 0).unwrap();
+    assert_eq!(result.len(), 5); // Should return all 5 test emojis
+
+    // Test with filter and max_top_emojis = 0
+    let result = manager.get_emojis("monkey", 0).unwrap();
+    assert!(result.contains(&"🐒".to_string()));
+    assert!(result.contains(&"🐵".to_string()));
 }

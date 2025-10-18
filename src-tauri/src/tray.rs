@@ -37,12 +37,17 @@ pub fn open_settings_window(app: &AppHandle) -> tauri::Result<()> {
     }
 
     // Create new settings window
-    WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
-        .title("Settings - emojiq")
-        .inner_size(500.0, 510.0)
-        .resizable(false)
-        .center()
-        .build()?;
+    let window =
+        WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+            .title("Settings - emojiq")
+            .inner_size(500.0, 595.0)
+            .resizable(false)
+            .center()
+            .focused(true)
+            .build()?;
+
+    // Explicitly set focus to ensure it gets it
+    window.set_focus()?;
 
     Ok(())
 }

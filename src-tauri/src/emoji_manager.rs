@@ -341,7 +341,7 @@ impl EmojiManager {
     }
 
     /// Emoji ordering by usage frequency
-    fn order_emojis_by_usage(&self, emojis: Vec<String>) -> Vec<String> {
+    fn order_emojis_by_usage(&self, emojis: Vec<String>, max_top_emojis: usize) -> Vec<String> {
         let data = match self.data.read() {
             Ok(data) => data,
             Err(_) => {
@@ -356,7 +356,7 @@ impl EmojiManager {
         }
 
         // Get top most used emojis
-        let top_emojis = self.get_top_emojis_from_ranks(&data.ranks, MAX_TOP_EMOJIS);
+        let top_emojis = self.get_top_emojis_from_ranks(&data.ranks, max_top_emojis);
 
         // Create HashSets for O(1) lookups instead of O(n) contains() calls
         let top_emojis_set: HashSet<&String> = top_emojis.iter().collect();
@@ -465,7 +465,11 @@ impl EmojiManager {
     }
 
     /// Get filtered emojis as array with optimized memory usage and result limits
-    pub fn get_emojis(&self, filter_word: &str) -> Result<Vec<String>, EmojiError> {
+    pub fn get_emojis(
+        &self,
+        filter_word: &str,
+        max_top_emojis: usize,
+    ) -> Result<Vec<String>, EmojiError> {
         println!("get_emojis called with filter: '{}'", filter_word);
         let filter_word = filter_word.trim().to_lowercase();
 
@@ -496,8 +500,12 @@ impl EmojiManager {
             }
         };
 
-        // Order emojis by usage frequency
-        let ordered_emojis = self.order_emojis_by_usage(emoji_list);
+        // Order emojis by usage frequency (skip if max_top_emojis is 0)
+        let ordered_emojis = if max_top_emojis == 0 {
+            emoji_list
+        } else {
+            self.order_emojis_by_usage(emoji_list, max_top_emojis)
+        };
 
         println!("Returning {} emojis", ordered_emojis.len());
         Ok(ordered_emojis)

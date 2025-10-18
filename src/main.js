@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   await renderPanel();
   setupEventListeners();
   setupWindowResizeHandler();
+  setupSettingsListener();
 });
 
 async function renderPanel() {
@@ -448,4 +449,14 @@ function setupWindowResizeHandler() {
       document.addEventListener('mouseup', handleMouseUp);
     });
   }
+}
+
+// Setup listener for settings changes
+async function setupSettingsListener() {
+  const { listen } = window.__TAURI__.event;
+
+  await listen('settings-changed', async () => {
+    // Reload emojis to apply new settings (e.g., max_top_emojis count)
+    await loadEmojis();
+  });
 }

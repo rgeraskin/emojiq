@@ -5,7 +5,8 @@ use crate::settings::{EmojiMode, Settings as AppSettings};
 use crate::tray;
 use crate::AppState;
 use enigo::{Enigo, Keyboard, Settings};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_nspanel::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[tauri::command]
@@ -80,9 +81,10 @@ pub fn reset_accessibility_cache() {
 // Emoji manager commands
 #[tauri::command]
 pub fn get_emojis(state: State<AppState>, filter_word: String) -> Result<Vec<String>, String> {
+    let settings = state.settings_manager.get().map_err(|e| e.to_string())?;
     state
         .emoji_manager
-        .get_emojis(&filter_word)
+        .get_emojis(&filter_word, settings.max_top_emojis)
         .map_err(|e| e.to_string())
 }
 
@@ -109,13 +111,45 @@ pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
 }
 
 #[tauri::command]
-pub fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<(), String> {
-    state.settings_manager.update(settings)
+pub fn update_settings(
+    handle: AppHandle,
+    state: State<AppState>,
+    settings: AppSettings,
+) -> Result<(), String> {
+    state.settings_manager.update(settings)?;
+
+    // Notify main window to refresh emoji list if it exists
+    if let Some(main_window) = handle.get_webview_window("main") {
+        let _ = main_window.emit("settings-changed", ());
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
-pub fn open_settings(handle: AppHandle) -> Result<(), String> {
-    tray::open_settings_window(&handle).map_err(|e| e.to_string())
+pub fn open_settings(handle: AppHandle, state: State<AppState>) -> Result<(), String> {
+    // Set flag to indicate we're opening settings
+    state
+        .opening_settings
+        .store(true, std::sync::atomic::Ordering::Release);
+
+    // Hide the main panel first if it's open to avoid focus conflicts
+    if let Ok(panel) = handle.get_webview_panel("main") {
+        if panel.is_visible() {
+            panel.hide();
+            // Small delay to ensure panel is fully hidden before opening settings
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
+
+    let result = tray::open_settings_window(&handle).map_err(|e| e.to_string());
+
+    // Clear the flag after settings window is opened
+    state
+        .opening_settings
+        .store(false, std::sync::atomic::Ordering::Release);
+
+    result
 }
 
 #[tauri::command]

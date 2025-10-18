@@ -9,6 +9,7 @@ mod settings;
 mod tray;
 
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
@@ -21,6 +22,7 @@ use crate::settings::SettingsManager;
 pub struct AppState {
     pub emoji_manager: Arc<EmojiManager>,
     pub settings_manager: Arc<SettingsManager>,
+    pub opening_settings: Arc<AtomicBool>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -98,6 +100,7 @@ pub fn run() {
             let app_state = AppState {
                 emoji_manager,
                 settings_manager,
+                opening_settings: Arc::new(AtomicBool::new(false)),
             };
             app.manage(app_state);
 

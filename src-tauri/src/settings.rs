@@ -33,6 +33,9 @@ pub struct Settings {
     /// Last window height (for persistence)
     #[serde(default = "default_window_height")]
     pub window_height: f64,
+    /// Maximum number of most used emojis to show first
+    #[serde(default = "default_max_top_emojis")]
+    pub max_top_emojis: usize,
 }
 
 fn default_window_width() -> f64 {
@@ -43,6 +46,10 @@ fn default_window_height() -> f64 {
     290.0
 }
 
+fn default_max_top_emojis() -> usize {
+    10
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -50,6 +57,7 @@ impl Default for Settings {
             emoji_mode: EmojiMode::default(),
             window_width: default_window_width(),
             window_height: default_window_height(),
+            max_top_emojis: default_max_top_emojis(),
         }
     }
 }

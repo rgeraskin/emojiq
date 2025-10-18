@@ -8,7 +8,6 @@ pub const RANK_WRITE_DELAY_SECS: u64 = 2;
 // Search constants
 pub const MIN_SEARCH_LENGTH: usize = 2;
 pub const MAX_SEARCH_RESULTS: usize = 2000;
-pub const MAX_TOP_EMOJIS: usize = 10;
 pub const MIN_KEYWORD_LENGTH: usize = 2;
 pub const MAX_PREFIX_LENGTH: usize = 12; // Cap for prefix indexing to bound memory
 

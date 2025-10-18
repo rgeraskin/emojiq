@@ -9,6 +9,18 @@ use crate::positioning::{position_window_at_cursor, restore_previous_app, store_
 use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_nspanel::{tauri_panel, CollectionBehavior, ManagerExt, StyleMask, WebviewWindowExt};
 
+/// Helper function to check if settings window is visible and focus it if so
+/// Returns true if settings was visible and focused
+fn try_focus_settings(handle: &AppHandle) -> bool {
+    if let Some(window) = handle.get_webview_window("settings") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.set_focus();
+            return true;
+        }
+    }
+    false
+}
+
 // Define custom panel class and event handler
 tauri_panel! {
     panel!(EmojiqPanel {
@@ -68,13 +80,27 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
 
     // Handle focus loss - hide panel and restore nonactivating_panel style
     let panel_for_handler = panel.clone();
+    let handle_for_handler = app_handle.clone();
     handler.window_did_resign_key(move |_notification| {
         println!("Panel lost focus, hiding panel");
         panel_for_handler.hide();
         // Restore nonactivating_panel for fullscreen compatibility
         panel_for_handler.set_style_mask(StyleMask::empty().nonactivating_panel().into());
 
-        // No need to unregister ESC shortcut since we're not using global ESC
+        // Check if we're opening settings - if so, don't restore focus yet
+        if let Some(state) = handle_for_handler.try_state::<crate::AppState>() {
+            if state
+                .opening_settings
+                .load(std::sync::atomic::Ordering::Acquire)
+            {
+                return;
+            }
+        }
+
+        // Try to focus settings window if it's open, otherwise restore previous app
+        if !try_focus_settings(&handle_for_handler) {
+            restore_previous_app();
+        }
     });
 
     panel.set_event_handler(Some(handler.as_ref()));
@@ -91,8 +117,10 @@ pub fn hide_panel(handle: AppHandle) -> Result<(), String> {
         println!("Panel is visible, hiding panel via command");
         panel.hide();
 
-        // Restore focus to the previously active application
-        restore_previous_app();
+        // Try to focus settings window if it's open, otherwise restore previous app
+        if !try_focus_settings(&handle) {
+            restore_previous_app();
+        }
     } else {
         println!("Panel is already hidden, why are we trying to hide it?");
     }
@@ -100,8 +128,17 @@ pub fn hide_panel(handle: AppHandle) -> Result<(), String> {
 }
 
 pub fn show_panel(handle: AppHandle) -> Result<(), String> {
-    // Store the currently active application before showing our panel
-    store_previous_app();
+    // Check if settings window is currently open and focused
+    // If so, don't store the previous app - we'll return focus to settings instead
+    let settings_is_open = handle
+        .get_webview_window("settings")
+        .map(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false))
+        .unwrap_or(false);
+
+    // Only store the previous app if settings window is not currently focused
+    if !settings_is_open {
+        store_previous_app();
+    }
 
     // Get the window first, then convert to panel (more reliable)
     if let Some(window) = handle.get_webview_window("main") {

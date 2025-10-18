@@ -27,6 +27,24 @@
         </div>
 
         <div class="setting-group">
+            <div class="setting-item">
+                <div class="setting-info">
+                    <div class="setting-label">Most used emojis count</div>
+                    <div class="setting-description">
+                        Number of most frequently used emojis to show first in the list (0 = no ordering)
+                    </div>
+                </div>
+                <div class="number-input-wrapper">
+                    <input type="number" id="maxTopEmojisInput" min="0" max="50" step="1" class="number-input">
+                    <div class="spinner-buttons">
+                        <button type="button" class="spinner-btn spinner-up" id="spinnerUp">▲</button>
+                        <button type="button" class="spinner-btn spinner-down" id="spinnerDown">▼</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="setting-group">
             <div class="setting-item-full">
                 <div class="setting-label">Emoji selection mode</div>
                 <div class="setting-description">
