@@ -1,5 +1,6 @@
 const { invoke } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
+const { open } = window.__TAURI__.shell;
 
 const placeUnderMouseToggle = document.getElementById('placeUnderMouseToggle');
 const emojiModePasteOnly = document.getElementById('emojiModePasteOnly');
@@ -72,6 +73,19 @@ window.addEventListener('keydown', async (e) => {
       await getCurrentWindow().close();
     } catch (error) {
       console.error('Failed to close window:', error);
+    }
+  }
+});
+
+// Handle external links
+document.addEventListener('click', async (e) => {
+  const target = e.target.closest('a');
+  if (target && target.href && target.href.startsWith('http')) {
+    e.preventDefault();
+    try {
+      await open(target.href);
+    } catch (error) {
+      console.error('Failed to open link:', error);
     }
   }
 });
