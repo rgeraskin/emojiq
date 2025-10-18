@@ -27,6 +27,20 @@ pub struct Settings {
     /// Emoji selection mode
     #[serde(default)]
     pub emoji_mode: EmojiMode,
+    /// Last window width (for persistence)
+    #[serde(default = "default_window_width")]
+    pub window_width: f64,
+    /// Last window height (for persistence)
+    #[serde(default = "default_window_height")]
+    pub window_height: f64,
+}
+
+fn default_window_width() -> f64 {
+    350.0
+}
+
+fn default_window_height() -> f64 {
+    290.0
 }
 
 impl Default for Settings {
@@ -34,6 +48,8 @@ impl Default for Settings {
         Self {
             place_under_mouse: true,
             emoji_mode: EmojiMode::default(),
+            window_width: default_window_width(),
+            window_height: default_window_height(),
         }
     }
 }
@@ -130,6 +146,15 @@ impl SettingsManager {
     pub fn set_place_under_mouse(&self, value: bool) -> Result<(), String> {
         let mut settings = self.get()?;
         settings.place_under_mouse = value;
+        self.update(settings)?;
+        Ok(())
+    }
+
+    /// Update window size in settings
+    pub fn update_window_size(&self, width: f64, height: f64) -> Result<(), String> {
+        let mut settings = self.get()?;
+        settings.window_width = width;
+        settings.window_height = height;
         self.update(settings)?;
         Ok(())
     }

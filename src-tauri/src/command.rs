@@ -1,4 +1,4 @@
-use crate::constants::*;
+use crate::constants::FOCUS_RESTORATION_DELAY_MS;
 use crate::panel;
 use crate::permissions::{ensure_accessibility_permission, reset_permission_cache};
 use crate::settings::{EmojiMode, Settings as AppSettings};
@@ -116,6 +116,11 @@ pub fn update_settings(state: State<AppState>, settings: AppSettings) -> Result<
 #[tauri::command]
 pub fn open_settings(handle: AppHandle) -> Result<(), String> {
     tray::open_settings_window(&handle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_window_size(state: State<AppState>, width: f64, height: f64) -> Result<(), String> {
+    state.settings_manager.update_window_size(width, height)
 }
 
 // #[tauri::command]

@@ -27,6 +27,17 @@ tauri_panel! {
 
 pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     let window: WebviewWindow = app_handle.get_webview_window("main").unwrap();
+
+    // Restore window size from settings
+    if let Some(state) = app_handle.try_state::<crate::AppState>() {
+        if let Ok(settings) = state.settings_manager.get() {
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                width: settings.window_width,
+                height: settings.window_height,
+            }));
+        }
+    }
+
     let panel = window.to_panel::<EmojiqPanel>().unwrap();
     let _ = hide_panel(app_handle.clone());
 

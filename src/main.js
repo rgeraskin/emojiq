@@ -4,7 +4,6 @@ const { invoke } = window.__TAURI__.core;
 const CONFIG = {
   EMOJI_BATCH_SIZE: 100,
   SEARCH_DEBOUNCE_MS: 150,
-  GRID_COLUMNS: 10,
   BUTTON_FOCUS_DELAY_MS: 100,
 };
 
@@ -31,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   await renderPanel();
   setupEventListeners();
+  setupWindowResizeHandler();
 });
 
 async function renderPanel() {
@@ -278,6 +278,32 @@ async function buttonFocus(button) {
   await updateKeywords(emoji);
 }
 
+// Get dynamic number of columns in the grid
+function getGridColumns() {
+  const buttons = emojiGrid.querySelectorAll('.emoji-button');
+  if (buttons.length < 2) return 1;
+
+  // Calculate columns by comparing Y positions of first two buttons
+  const firstButtonRect = buttons[0].getBoundingClientRect();
+  const secondButtonRect = buttons[1].getBoundingClientRect();
+
+  // If they're on the same row, count how many are on this row
+  if (Math.abs(firstButtonRect.top - secondButtonRect.top) < 5) {
+    let cols = 1;
+    for (let i = 1; i < buttons.length; i++) {
+      const rect = buttons[i].getBoundingClientRect();
+      if (Math.abs(rect.top - firstButtonRect.top) < 5) {
+        cols++;
+      } else {
+        break;
+      }
+    }
+    return cols;
+  }
+
+  return 1;
+}
+
 // Handle keyboard navigation in emoji grid
 function handleGridNavigation(e) {
   const buttons = emojiGrid.querySelectorAll('.emoji-button');
@@ -286,17 +312,18 @@ function handleGridNavigation(e) {
   const focused = document.activeElement;
   if (!focused.classList.contains('emoji-button')) return;
 
+  const gridColumns = getGridColumns();
   let elementIndex = Array.from(buttons).indexOf(focused);
-  let column = elementIndex % CONFIG.GRID_COLUMNS;
-  let row = Math.floor(elementIndex / CONFIG.GRID_COLUMNS);
-  const totalRows = Math.ceil(buttons.length / CONFIG.GRID_COLUMNS);
+  let column = elementIndex % gridColumns;
+  let row = Math.floor(elementIndex / gridColumns);
+  const totalRows = Math.ceil(buttons.length / gridColumns);
 
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
       if (row < totalRows - 1) {
         row++;
-        elementIndex = Math.min(row * CONFIG.GRID_COLUMNS + column, buttons.length - 1);
+        elementIndex = Math.min(row * gridColumns + column, buttons.length - 1);
         buttonFocus(buttons[elementIndex]);
       }
       break;
@@ -307,7 +334,7 @@ function handleGridNavigation(e) {
         previousElementIndex = elementIndex;
       } else {
         row--;
-        elementIndex = row * CONFIG.GRID_COLUMNS + column;
+        elementIndex = row * gridColumns + column;
         buttonFocus(buttons[elementIndex]);
       }
       break;
@@ -358,4 +385,67 @@ async function selectEmoji(emoji) {
 // Update status bar
 function updateStatus(message) {
   statusBar.textContent = message;
+}
+
+// Setup window resize handler to save size
+function setupWindowResizeHandler() {
+  let resizeTimeout;
+
+  // Save window size when it changes
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(async () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      try {
+        await invoke('save_window_size', { width, height });
+      } catch (error) {
+        console.error('Failed to save window size:', error);
+      }
+    }, 500);
+  });
+
+  // Implement custom resize handle for NSPanel
+  const resizeHandle = document.getElementById('resizeHandle');
+  if (resizeHandle) {
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight;
+
+    // Import getCurrentWindow
+    const { getCurrentWindow } = window.__TAURI__.window;
+    const currentWindow = getCurrentWindow();
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing = true;
+
+      startX = e.clientX;
+      startY = e.clientY;
+      startWidth = window.innerWidth;
+      startHeight = window.innerHeight;
+
+      const handleMouseMove = (moveEvent) => {
+        if (!isResizing) return;
+
+        const deltaX = moveEvent.clientX - startX;
+        const deltaY = moveEvent.clientY - startY;
+
+        const newWidth = Math.max(120, startWidth + deltaX);
+        const newHeight = Math.max(120, startHeight + deltaY);
+
+        currentWindow.setSize({ type: 'Logical', width: newWidth, height: newHeight })
+          .catch(error => console.error('Failed to resize window:', error));
+      };
+
+      const handleMouseUp = () => {
+        isResizing = false;
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    });
+  }
 }

@@ -43,9 +43,14 @@ function getSelectedEmojiMode() {
 // Save settings when changed
 async function saveSettings() {
   try {
+    // Get current settings first to preserve window size
+    const currentSettings = await invoke('get_settings');
+
     const settings = {
       place_under_mouse: placeUnderMouseToggle.checked,
-      emoji_mode: getSelectedEmojiMode()
+      emoji_mode: getSelectedEmojiMode(),
+      window_width: currentSettings.window_width,
+      window_height: currentSettings.window_height
     };
     await invoke('update_settings', { settings });
   } catch (error) {

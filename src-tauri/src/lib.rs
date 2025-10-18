@@ -40,6 +40,7 @@ pub fn run() {
             command::get_settings,
             command::update_settings,
             command::open_settings,
+            command::save_window_size,
         ])
         .setup(|app| {
             // Set activation policy to Accessory to prevent the app icon from showing on the dock
