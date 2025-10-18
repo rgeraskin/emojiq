@@ -541,4 +541,23 @@ impl EmojiManager {
 
         Ok(())
     }
+
+    /// Reset all emoji usage ranks
+    pub fn reset_ranks(&self) -> Result<(), EmojiError> {
+        println!("Resetting all emoji ranks");
+
+        // Clear ranks data
+        {
+            let mut data = self.data.write().map_lock_err()?;
+            data.ranks.clear();
+        }
+
+        // Write empty ranks to file immediately
+        let ranks_data: HashMap<String, u32> = HashMap::new();
+        let json_content = serde_json::to_string(&ranks_data)?;
+        fs::write(&self.ranks_file_path, json_content)?;
+
+        println!("All emoji ranks have been reset");
+        Ok(())
+    }
 }

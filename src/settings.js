@@ -1,6 +1,7 @@
 const { invoke } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
 const { open } = window.__TAURI__.shell;
+const { ask } = window.__TAURI__.dialog;
 
 let placeUnderMouseToggle;
 let maxTopEmojisInput;
@@ -9,6 +10,7 @@ let emojiModeCopyOnly;
 let emojiModePasteAndCopy;
 let scaleFactorSlider;
 let scaleValue;
+let resetRanksButton;
 
 // Load settings on page load
 async function loadSettings() {
@@ -104,6 +106,43 @@ function decrementValue() {
   }
 }
 
+// Reset emoji ranks handler
+async function handleResetRanks() {
+  console.log('Reset button clicked');
+
+  try {
+    const confirmed = await ask('Are you sure you want to reset all emoji usage statistics? This cannot be undone.', {
+      title: 'Reset Emoji Ranks',
+      type: 'warning',
+      okLabel: 'Reset',
+      cancelLabel: 'Cancel'
+    });
+
+    if (!confirmed) {
+      console.log('User cancelled reset');
+      return;
+    }
+
+    console.log('Starting reset...');
+    resetRanksButton.disabled = true;
+    resetRanksButton.textContent = 'Resetting...';
+
+    await invoke('reset_emoji_ranks');
+    console.log('Reset successful');
+
+    resetRanksButton.textContent = 'Reset Complete!';
+    setTimeout(() => {
+      resetRanksButton.textContent = 'Reset Emoji Ranks';
+      resetRanksButton.disabled = false;
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to reset emoji ranks:', error);
+    alert('Failed to reset emoji ranks: ' + error);
+    resetRanksButton.textContent = 'Reset Emoji Ranks';
+    resetRanksButton.disabled = false;
+  }
+}
+
 // Setup event listeners
 function setupEventListeners() {
   placeUnderMouseToggle.addEventListener('change', saveSettings);
@@ -124,6 +163,9 @@ function setupEventListeners() {
 
   spinnerUp.addEventListener('click', incrementValue);
   spinnerDown.addEventListener('click', decrementValue);
+
+  // Reset ranks button
+  resetRanksButton.addEventListener('click', handleResetRanks);
 
   // ESC key to close settings window
   window.addEventListener('keydown', async (e) => {
@@ -161,6 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   emojiModePasteAndCopy = document.getElementById('emojiModePasteAndCopy');
   scaleFactorSlider = document.getElementById('scaleFactorSlider');
   scaleValue = document.getElementById('scaleValue');
+  resetRanksButton = document.getElementById('resetRanksButton');
 
   // Load settings first
   await loadSettings();

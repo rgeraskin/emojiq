@@ -31,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_nspanel::init())
         .invoke_handler(tauri::generate_handler![
             command::show_panel,
@@ -40,6 +41,7 @@ pub fn run() {
             command::get_emojis,
             command::get_keywords,
             command::increment_usage,
+            command::reset_emoji_ranks,
             command::get_settings,
             command::update_settings,
             command::open_settings,

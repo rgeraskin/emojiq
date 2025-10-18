@@ -104,6 +104,21 @@ pub fn increment_usage(state: State<AppState>, emoji: String) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn reset_emoji_ranks(handle: AppHandle, state: State<AppState>) -> Result<(), String> {
+    state
+        .emoji_manager
+        .reset_ranks()
+        .map_err(|e| e.to_string())?;
+
+    // Notify main window to refresh emoji list if it exists
+    if let Some(main_window) = handle.get_webview_window("main") {
+        let _ = main_window.emit("settings-changed", ());
+    }
+
+    Ok(())
+}
+
 // Settings commands
 #[tauri::command]
 pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {

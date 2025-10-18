@@ -26,8 +26,8 @@ body {
     max-width: 100%;
     display: flex;
     flex-direction: column;
-    padding: calc(20px * var(--settings-scale));
-    gap: calc(16px * var(--settings-scale));
+    padding: calc(16px * var(--settings-scale));
+    gap: calc(8px * var(--settings-scale));
 }
 
 .setting-group {
@@ -147,7 +147,7 @@ input:checked+.slider:before {
 .number-input {
     width: calc(70px * var(--settings-scale));
     height: calc(50px * var(--settings-scale));
-    padding: calc(10px * var(--settings-scale)) calc(12px * var(--settings-scale));
+    padding: calc(6px * var(--settings-scale)) calc(12px * var(--settings-scale));
     font-size: calc(18px * var(--settings-scale));
     font-weight: 600;
     border: calc(2px * var(--settings-scale)) solid #e0e0e0;
@@ -285,7 +285,7 @@ input:checked+.slider:before {
 }
 
 .status-message {
-    padding: calc(8px * var(--settings-scale)) calc(16px * var(--settings-scale));
+    padding: calc(6px * var(--settings-scale)) calc(16px * var(--settings-scale));
     border-radius: calc(8px * var(--settings-scale));
     font-size: calc(13px * var(--settings-scale));
     text-align: center;
@@ -315,7 +315,7 @@ input:checked+.slider:before {
     display: flex;
     align-items: center;
     gap: calc(16px * var(--settings-scale));
-    padding: calc(8px * var(--settings-scale)) 0;
+    padding: calc(6px * var(--settings-scale)) 0;
 }
 
 .scale-slider {
@@ -373,8 +373,39 @@ input:checked+.slider:before {
     font-variant-numeric: tabular-nums;
 }
 
+/* Reset Button */
+.reset-button {
+    padding: calc(6px * var(--settings-scale)) calc(16px * var(--settings-scale));
+    background: #ffffff;
+    color: #dc3545;
+    border: calc(2px * var(--settings-scale)) solid #dc3545;
+    border-radius: calc(8px * var(--settings-scale));
+    font-size: calc(13px * var(--settings-scale));
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    user-select: none;
+}
+
+.reset-button:hover {
+    background: #dc3545;
+    color: #ffffff;
+    box-shadow: 0 calc(2px * var(--settings-scale)) calc(8px * var(--settings-scale)) rgba(220, 53, 69, 0.3);
+}
+
+.reset-button:active {
+    transform: scale(0.98);
+}
+
+.reset-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .footer {
-    padding-top: calc(12px * var(--settings-scale));
+    padding-top: calc(6px * var(--settings-scale));
     border-top: calc(1px * var(--settings-scale)) solid #e0e0e0;
     text-align: center;
     font-size: calc(11px * var(--settings-scale));
