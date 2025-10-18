@@ -46,6 +46,21 @@
 
         <div class="setting-group">
             <div class="setting-item-full">
+                <div class="setting-info">
+                    <div class="setting-label">UI Scale Factor</div>
+                    <div class="setting-description">
+                        Adjust the size of all UI elements in the main panel (50% - 200%)
+                    </div>
+                </div>
+                <div class="scale-control">
+                    <input type="range" id="scaleFactorSlider" min="0.5" max="2.0" step="0.1" class="scale-slider">
+                    <div class="scale-value" id="scaleValue">100%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <div class="setting-item-full">
                 <div class="setting-label">Emoji selection mode</div>
                 <div class="setting-description">
                     Choose how emojis are handled when selected

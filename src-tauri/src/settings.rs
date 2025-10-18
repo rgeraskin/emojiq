@@ -36,6 +36,9 @@ pub struct Settings {
     /// Maximum number of most used emojis to show first
     #[serde(default = "default_max_top_emojis")]
     pub max_top_emojis: usize,
+    /// Scale factor for UI elements (0.5 to 2.0)
+    #[serde(default = "default_scale_factor")]
+    pub scale_factor: f64,
 }
 
 fn default_window_width() -> f64 {
@@ -50,6 +53,10 @@ fn default_max_top_emojis() -> usize {
     10
 }
 
+fn default_scale_factor() -> f64 {
+    1.0
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -58,6 +65,7 @@ impl Default for Settings {
             window_width: default_window_width(),
             window_height: default_window_height(),
             max_top_emojis: default_max_top_emojis(),
+            scale_factor: default_scale_factor(),
         }
     }
 }

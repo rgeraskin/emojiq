@@ -7,6 +7,8 @@ let maxTopEmojisInput;
 let emojiModePasteOnly;
 let emojiModeCopyOnly;
 let emojiModePasteAndCopy;
+let scaleFactorSlider;
+let scaleValue;
 
 // Load settings on page load
 async function loadSettings() {
@@ -17,6 +19,11 @@ async function loadSettings() {
     // Set the value
     const maxTopEmojisValue = settings.max_top_emojis !== undefined ? settings.max_top_emojis : 10;
     maxTopEmojisInput.value = maxTopEmojisValue;
+
+    // Set scale factor
+    const scaleFactor = settings.scale_factor !== undefined ? settings.scale_factor : 1.0;
+    scaleFactorSlider.value = scaleFactor;
+    updateScaleDisplay(scaleFactor);
 
     // Set the appropriate radio button based on emoji_mode
     const emojiMode = settings.emoji_mode || 'paste_only';
@@ -46,6 +53,12 @@ function getSelectedEmojiMode() {
   return 'paste_only'; // default
 }
 
+// Update scale factor display
+function updateScaleDisplay(value) {
+  const percentage = Math.round(value * 100);
+  scaleValue.textContent = `${percentage}%`;
+}
+
 // Save settings when changed
 async function saveSettings() {
   try {
@@ -55,10 +68,14 @@ async function saveSettings() {
     const parsedValue = parseInt(maxTopEmojisInput.value);
     const max_top_emojis = isNaN(parsedValue) ? 10 : parsedValue;
 
+    const parsedScaleFactor = parseFloat(scaleFactorSlider.value);
+    const scale_factor = isNaN(parsedScaleFactor) ? 1.0 : parsedScaleFactor;
+
     const settings = {
       place_under_mouse: placeUnderMouseToggle.checked,
       emoji_mode: getSelectedEmojiMode(),
       max_top_emojis: max_top_emojis,
+      scale_factor: scale_factor,
       window_width: currentSettings.window_width,
       window_height: currentSettings.window_height
     };
@@ -94,6 +111,12 @@ function setupEventListeners() {
   emojiModePasteOnly.addEventListener('change', saveSettings);
   emojiModeCopyOnly.addEventListener('change', saveSettings);
   emojiModePasteAndCopy.addEventListener('change', saveSettings);
+
+  // Scale factor slider
+  scaleFactorSlider.addEventListener('input', (e) => {
+    updateScaleDisplay(parseFloat(e.target.value));
+  });
+  scaleFactorSlider.addEventListener('change', saveSettings);
 
   // Custom spinner buttons
   const spinnerUp = document.getElementById('spinnerUp');
@@ -136,6 +159,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   emojiModePasteOnly = document.getElementById('emojiModePasteOnly');
   emojiModeCopyOnly = document.getElementById('emojiModeCopyOnly');
   emojiModePasteAndCopy = document.getElementById('emojiModePasteAndCopy');
+  scaleFactorSlider = document.getElementById('scaleFactorSlider');
+  scaleValue = document.getElementById('scaleValue');
 
   // Load settings first
   await loadSettings();

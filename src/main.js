@@ -28,6 +28,7 @@ let currentBatch = 0;
 document.addEventListener('DOMContentLoaded', async function () {
   console.log('EmojiQ initialized');
 
+  await applyScaleFactor();
   await renderPanel();
   setupEventListeners();
   setupWindowResizeHandler();
@@ -451,11 +452,28 @@ function setupWindowResizeHandler() {
   }
 }
 
+// Apply scale factor from settings
+async function applyScaleFactor() {
+  try {
+    const settings = await invoke('get_settings');
+    const scaleFactor = settings.scale_factor !== undefined ? settings.scale_factor : 1.0;
+
+    // Apply scale factor to the root element via CSS variable
+    document.documentElement.style.setProperty('--scale-factor', scaleFactor);
+
+    console.log('Applied scale factor:', scaleFactor);
+  } catch (error) {
+    console.error('Failed to apply scale factor:', error);
+  }
+}
+
 // Setup listener for settings changes
 async function setupSettingsListener() {
   const { listen } = window.__TAURI__.event;
 
   await listen('settings-changed', async () => {
+    // Apply new scale factor
+    await applyScaleFactor();
     // Reload emojis to apply new settings (e.g., max_top_emojis count)
     await loadEmojis();
   });
