@@ -1,4 +1,5 @@
 use crate::constants::FOCUS_RESTORATION_DELAY_MS;
+use crate::hotkey;
 use crate::panel;
 use crate::permissions::{ensure_accessibility_permission, reset_permission_cache};
 use crate::settings::{EmojiMode, Settings as AppSettings};
@@ -8,6 +9,7 @@ use enigo::{Enigo, Keyboard, Settings};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_nspanel::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[tauri::command]
 pub fn show_panel(handle: AppHandle) -> Result<(), String> {
@@ -150,11 +152,30 @@ pub fn update_settings(
     state: State<AppState>,
     settings: AppSettings,
 ) -> Result<(), String> {
+    // Check if hotkey has changed
+    let old_settings = state.settings_manager.get()?;
+    let hotkey_changed = old_settings.global_hotkey != settings.global_hotkey;
+
+    if hotkey_changed {
+        println!(
+            "Hotkey changed from '{}' to '{}'",
+            old_settings.global_hotkey, settings.global_hotkey
+        );
+    }
+
     state.settings_manager.update(settings)?;
 
     // Notify main window to refresh emoji list if it exists
     if let Some(main_window) = handle.get_webview_window("main") {
         let _ = main_window.emit("settings-changed", ());
+    }
+
+    // Re-register hotkey if it changed
+    if hotkey_changed {
+        println!("Hotkey changed, re-registering...");
+        if let Err(e) = reregister_hotkey(handle.clone(), state) {
+            println!("Failed to re-register hotkey: {}", e);
+        }
     }
 
     Ok(())
@@ -189,6 +210,53 @@ pub fn open_settings(handle: AppHandle, state: State<AppState>) -> Result<(), St
 #[tauri::command]
 pub fn save_window_size(state: State<AppState>, width: f64, height: f64) -> Result<(), String> {
     state.settings_manager.update_window_size(width, height)
+}
+
+#[tauri::command]
+pub fn reregister_hotkey(handle: AppHandle, state: State<AppState>) -> Result<(), String> {
+    println!("Re-registering hotkey...");
+
+    // Make sure panel is hidden before re-registering
+    println!("Ensuring panel is hidden before re-registration...");
+    let _ = hide_panel(handle.clone());
+
+    // Get the new hotkey from settings
+    let settings = state.settings_manager.get()?;
+    let new_hotkey_str = settings.global_hotkey.clone();
+
+    // Parse the new hotkey
+    let new_shortcut = hotkey::parse_hotkey(&new_hotkey_str)
+        .map_err(|e| format!("Failed to parse hotkey '{}': {}", new_hotkey_str, e))?;
+
+    // Unregister ALL shortcuts to ensure clean state
+    println!("Unregistering all shortcuts");
+    handle
+        .global_shortcut()
+        .unregister_all()
+        .map_err(|e| format!("Failed to unregister shortcuts: {}", e))?;
+
+    // Longer delay to ensure OS processes the unregistration
+    println!("Waiting for unregistration to complete...");
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    // Register the new shortcut (single global handler will handle events)
+    println!("Registering new hotkey: {}", new_hotkey_str);
+    handle
+        .global_shortcut()
+        .register(new_shortcut)
+        .map_err(|e| format!("Failed to register new hotkey: {}", e))?;
+
+    // Update the stored shortcut
+    {
+        let mut current = state
+            .current_shortcut
+            .lock()
+            .map_err(|e| format!("Failed to lock shortcut: {}", e))?;
+        *current = new_shortcut;
+    }
+
+    println!("Hotkey successfully re-registered to: {}", new_hotkey_str);
+    Ok(())
 }
 
 // #[tauri::command]

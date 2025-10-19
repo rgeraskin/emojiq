@@ -40,7 +40,7 @@ pub fn open_settings_window(app: &AppHandle) -> tauri::Result<()> {
     let window =
         WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
             .title("Settings - emojiq")
-            .inner_size(400.0, 645.0)
+            .inner_size(400.0, 755.0)
             .resizable(false)
             .center()
             .focused(true)

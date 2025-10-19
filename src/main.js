@@ -120,8 +120,10 @@ async function loadEmojis(filter = '') {
   try {
     // Show loading state
     updateStatus('Loading emojis...');
+    console.log('loadEmojis called with filter:', filter);
 
     const emojis = await invoke("get_emojis", { filterWord: filter });
+    console.log('Received emojis from backend:', emojis ? emojis.length : 0);
 
     // Validate response
     if (!Array.isArray(emojis)) {
@@ -130,6 +132,7 @@ async function loadEmojis(filter = '') {
 
     // Trim emojis to avoid empty strings
     gridEmojis = emojis.filter(emoji => emoji.trim() !== '');
+    console.log('Filtered emojis count:', gridEmojis.length);
 
     renderEmojis();
 

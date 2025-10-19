@@ -1,8 +1,10 @@
 const { invoke } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
 const { open } = window.__TAURI__.shell;
-const { ask } = window.__TAURI__.dialog;
+const { ask, message } = window.__TAURI__.dialog;
 
+let hotkeyInput;
+let hotkeyReset;
 let placeUnderMouseToggle;
 let maxTopEmojisInput;
 let emojiModePasteOnly;
@@ -16,6 +18,11 @@ let resetRanksButton;
 async function loadSettings() {
   try {
     const settings = await invoke('get_settings');
+
+    // Set hotkey
+    const globalHotkey = settings.global_hotkey || 'Cmd+Option+Space';
+    hotkeyInput.value = globalHotkey;
+
     placeUnderMouseToggle.checked = settings.place_under_mouse;
 
     // Set the value
@@ -74,6 +81,7 @@ async function saveSettings() {
     const scale_factor = isNaN(parsedScaleFactor) ? 1.0 : parsedScaleFactor;
 
     const settings = {
+      global_hotkey: hotkeyInput.value || 'Cmd+Option+Space',
       place_under_mouse: placeUnderMouseToggle.checked,
       emoji_mode: getSelectedEmojiMode(),
       max_top_emojis: max_top_emojis,
@@ -104,6 +112,124 @@ function decrementValue() {
     maxTopEmojisInput.value = currentValue - 1;
     saveSettings();
   }
+}
+
+// Hotkey capture functionality
+let isCapturingHotkey = false;
+let hotkeyCaptured = false;
+
+function captureHotkey(event) {
+  if (!isCapturingHotkey) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  // Build the key combination string
+  const parts = [];
+  let hasNonModifierKey = false;
+
+  // Map to macOS-style names
+  if (event.metaKey) parts.push('Cmd');
+  if (event.ctrlKey) parts.push('Ctrl');
+  if (event.altKey) parts.push('Option');
+  if (event.shiftKey) parts.push('Shift');
+
+  // Use event.code for physical key (not affected by shift/modifiers)
+  const code = event.code;
+
+  // Skip if it's just a modifier key
+  if (!['MetaLeft', 'MetaRight', 'ControlLeft', 'ControlRight',
+    'AltLeft', 'AltRight', 'ShiftLeft', 'ShiftRight'].includes(code)) {
+
+    let keyName = codeToKeyName(code);
+    if (keyName) {
+      parts.push(keyName);
+      hasNonModifierKey = true;
+    }
+  }
+
+  // Need at least one modifier and one non-modifier key
+  if (parts.length >= 2 && hasNonModifierKey) {
+    hotkeyInput.value = parts.join('+');
+    hotkeyCaptured = true;
+    isCapturingHotkey = false;
+    saveSettings();
+    hotkeyInput.blur();
+  }
+}
+
+// Convert JavaScript event.code to our key name format
+function codeToKeyName(code) {
+  // Letters (KeyA -> A)
+  if (code.startsWith('Key')) {
+    return code.substring(3).toUpperCase();
+  }
+
+  // Numbers (Digit0 -> 0)
+  if (code.startsWith('Digit')) {
+    return code.substring(5);
+  }
+
+  // Function keys (F1-F12)
+  if (code.match(/^F\d+$/)) {
+    return code;
+  }
+
+  // Special keys mapping
+  const specialKeys = {
+    'Space': 'Space',
+    'Enter': 'Enter',
+    'Tab': 'Tab',
+    'Backspace': 'Backspace',
+    'Delete': 'Delete',
+    'Escape': 'Escape',
+    'Home': 'Home',
+    'End': 'End',
+    'PageUp': 'PageUp',
+    'PageDown': 'PageDown',
+    'ArrowUp': 'ArrowUp',
+    'ArrowDown': 'ArrowDown',
+    'ArrowLeft': 'ArrowLeft',
+    'ArrowRight': 'ArrowRight',
+    'Minus': 'Minus',
+    'Equal': 'Equal',
+    'BracketLeft': 'BracketLeft',
+    'BracketRight': 'BracketRight',
+    'Backslash': 'Backslash',
+    'Semicolon': 'Semicolon',
+    'Quote': 'Quote',
+    'Comma': 'Comma',
+    'Period': 'Period',
+    'Slash': 'Slash',
+    'Backquote': 'Backquote',
+  };
+
+  return specialKeys[code] || null;
+}
+
+function startHotkeyCapture() {
+  isCapturingHotkey = true;
+  hotkeyCaptured = false;
+  hotkeyInput.value = 'Press keys...';
+  hotkeyInput.classList.add('capturing');
+}
+
+function stopHotkeyCapture() {
+  isCapturingHotkey = false;
+  hotkeyInput.classList.remove('capturing');
+
+  // Only restore previous value if user didn't capture a new hotkey
+  if (!hotkeyCaptured) {
+    loadSettings();
+  }
+
+  // Reset flag
+  hotkeyCaptured = false;
+}
+
+function resetHotkey() {
+  hotkeyInput.value = 'Cmd+Option+Space';
+  saveSettings();
 }
 
 // Reset emoji ranks handler
@@ -145,6 +271,12 @@ async function handleResetRanks() {
 
 // Setup event listeners
 function setupEventListeners() {
+  // Hotkey input
+  hotkeyInput.addEventListener('focus', startHotkeyCapture);
+  hotkeyInput.addEventListener('blur', stopHotkeyCapture);
+  hotkeyInput.addEventListener('keydown', captureHotkey);
+  hotkeyReset.addEventListener('click', resetHotkey);
+
   placeUnderMouseToggle.addEventListener('change', saveSettings);
   maxTopEmojisInput.addEventListener('change', saveSettings);
   emojiModePasteOnly.addEventListener('change', saveSettings);
@@ -167,9 +299,9 @@ function setupEventListeners() {
   // Reset ranks button
   resetRanksButton.addEventListener('click', handleResetRanks);
 
-  // ESC key to close settings window
+  // ESC key to close settings window (but not when capturing hotkey)
   window.addEventListener('keydown', async (e) => {
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' && !isCapturingHotkey) {
       e.preventDefault();
       try {
         await getCurrentWindow().close();
@@ -196,6 +328,8 @@ function setupEventListeners() {
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
   // Get DOM elements
+  hotkeyInput = document.getElementById('hotkeyInput');
+  hotkeyReset = document.getElementById('hotkeyReset');
   placeUnderMouseToggle = document.getElementById('placeUnderMouseToggle');
   maxTopEmojisInput = document.getElementById('maxTopEmojisInput');
   emojiModePasteOnly = document.getElementById('emojiModePasteOnly');
@@ -213,5 +347,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Then setup event listeners
   setupEventListeners();
+
 });
 

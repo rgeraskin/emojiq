@@ -2,6 +2,7 @@ mod command;
 mod constants;
 pub mod emoji_manager;
 mod errors;
+mod hotkey;
 mod panel;
 mod permissions;
 mod positioning;
@@ -9,10 +10,11 @@ mod settings;
 mod tray;
 
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+// time utilities not needed here anymore
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::emoji_manager::EmojiManager;
 use crate::settings::SettingsManager;
@@ -23,16 +25,81 @@ pub struct AppState {
     pub emoji_manager: Arc<EmojiManager>,
     pub settings_manager: Arc<SettingsManager>,
     pub opening_settings: Arc<AtomicBool>,
+    pub current_shortcut: Arc<Mutex<Shortcut>>,
+    pub shortcut_pressed: Arc<AtomicBool>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Pre-initialize to get hotkey setting before building the app
+    let hotkey_str = {
+        // We need to determine the settings file path before the app is built
+        // This is a bit of a workaround, but necessary for global shortcut registration
+        let home_dir = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let settings_file = PathBuf::from(home_dir)
+            .join("Library/Application Support/dev.rgeraskin.emojiq")
+            .join(constants::DEFAULT_SETTINGS_FILE);
+
+        if settings_file.exists() {
+            if let Ok(content) = std::fs::read_to_string(&settings_file) {
+                if let Ok(settings) = serde_json::from_str::<settings::Settings>(&content) {
+                    settings.global_hotkey
+                } else {
+                    settings::Settings::default().global_hotkey
+                }
+            } else {
+                settings::Settings::default().global_hotkey
+            }
+        } else {
+            settings::Settings::default().global_hotkey
+        }
+    };
+
+    // Parse the hotkey string
+    let shortcut = match hotkey::parse_hotkey(&hotkey_str) {
+        Ok(s) => s,
+        Err(e) => {
+            println!(
+                "Warning: Failed to parse hotkey '{}': {}. Using default.",
+                hotkey_str, e
+            );
+            hotkey::parse_hotkey("Cmd+Option+Space").unwrap()
+        }
+    };
+
+    println!("Registering global hotkey: {}", hotkey_str);
+
     tauri::Builder::default()
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_nspanel::init())
+        // Initialize global shortcut plugin FIRST with a single global handler
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if let Some(state) = app.try_state::<crate::AppState>() {
+                        match event.state {
+                            ShortcutState::Pressed => {
+                                state.shortcut_pressed.store(true, Ordering::Relaxed);
+                            }
+                            ShortcutState::Released => {
+                                let was_pressed = state
+                                    .shortcut_pressed
+                                    .swap(false, Ordering::Relaxed);
+                                if !was_pressed {
+                                    println!("Global handler: Ignoring duplicate release");
+                                    return;
+                                }
+                                let handle = app.app_handle();
+                                let _ = panel::toggle_panel(handle.clone());
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             command::show_panel,
             command::hide_panel,
@@ -47,8 +114,9 @@ pub fn run() {
             command::update_settings,
             command::open_settings,
             command::save_window_size,
+            command::reregister_hotkey,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             // Set activation policy to Accessory to prevent the app icon from showing on the dock
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -104,30 +172,23 @@ pub fn run() {
                 emoji_manager,
                 settings_manager,
                 opening_settings: Arc::new(AtomicBool::new(false)),
+                current_shortcut: Arc::new(Mutex::new(shortcut.clone())),
+                shortcut_pressed: Arc::new(AtomicBool::new(false)),
             };
             app.manage(app_state);
 
-            panel::init(app.app_handle())?;
-            tray::init(app.app_handle())?;
+            let app_handle = app.app_handle();
+
+            panel::init(&app_handle)?;
+            tray::init(&app_handle)?;
+
+            // Register initial global shortcut (single central handler already set by plugin)
+            if let Err(e) = app_handle.global_shortcut().register(shortcut.clone()) {
+                println!("Failed to register initial hotkey: {}", e);
+            }
 
             Ok(())
         })
-        // Register global shortcuts (only Option+Cmd+Space, ESC will be registered dynamically)
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcut(Shortcut::new(Some(Modifiers::SUPER | Modifiers::ALT), Code::Space))
-                .unwrap()
-                .with_handler(|app, shortcut, event| {
-                    let handle = app.app_handle();
-                    // Handle Option+Cmd+Space to toggle panel
-                    if event.state == ShortcutState::Pressed
-                        && shortcut.matches(Modifiers::SUPER | Modifiers::ALT, Code::Space)
-                    {
-                        let _ = panel::toggle_panel(handle.clone());
-                    }
-                })
-                .build(),
-        )
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

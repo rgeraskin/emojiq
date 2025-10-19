@@ -373,6 +373,133 @@ input:checked+.slider:before {
     font-variant-numeric: tabular-nums;
 }
 
+/* Hotkey Input Wrapper */
+.hotkey-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: calc(8px * var(--settings-scale));
+}
+
+/* Hotkey Input */
+.hotkey-input {
+    flex: 1;
+    height: calc(40px * var(--settings-scale));
+    padding: calc(8px * var(--settings-scale)) calc(16px * var(--settings-scale));
+    font-size: calc(14px * var(--settings-scale));
+    font-weight: 500;
+    border: calc(2px * var(--settings-scale)) solid #e0e0e0;
+    border-radius: calc(8px * var(--settings-scale));
+    background: #ffffff;
+    color: #333;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', 'Monaco', 'Courier', monospace;
+    letter-spacing: 0.5px;
+}
+
+.hotkey-input:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.hotkey-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 calc(3px * var(--settings-scale)) rgba(102, 126, 234, 0.1);
+}
+
+.hotkey-input.capturing {
+    border-color: #667eea;
+    background: #f0f4ff;
+    color: #667eea;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        border-color: #667eea;
+    }
+
+    50% {
+        border-color: #5568d3;
+        box-shadow: 0 0 0 calc(3px * var(--settings-scale)) rgba(102, 126, 234, 0.2);
+    }
+}
+
+/* Hotkey Reset Button */
+.hotkey-reset {
+    width: calc(36px * var(--settings-scale));
+    height: calc(40px * var(--settings-scale));
+    padding: 0;
+    background: #ffffff;
+    color: #667eea;
+    border: calc(2px * var(--settings-scale)) solid #e0e0e0;
+    border-radius: calc(8px * var(--settings-scale));
+    font-size: calc(18px * var(--settings-scale));
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.hotkey-reset:hover {
+    background: #f0f4ff;
+    border-color: #667eea;
+    transform: rotate(180deg);
+}
+
+.hotkey-reset:active {
+    background: #667eea;
+    color: white;
+    transform: rotate(180deg) scale(0.95);
+}
+
+/* Restart App Button */
+.restart-app-button {
+    margin-top: calc(12px * var(--settings-scale));
+    padding: calc(10px * var(--settings-scale)) calc(20px * var(--settings-scale));
+    background: #667eea;
+    color: #ffffff;
+    border: none;
+    border-radius: calc(8px * var(--settings-scale));
+    font-size: calc(14px * var(--settings-scale));
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: calc(8px * var(--settings-scale));
+    user-select: none;
+    width: 100%;
+}
+
+.restart-app-button:hover {
+    background: #5568d3;
+    box-shadow: 0 calc(4px * var(--settings-scale)) calc(12px * var(--settings-scale)) rgba(102, 126, 234, 0.3);
+    transform: translateY(calc(-2px * var(--settings-scale)));
+}
+
+.restart-app-button:active {
+    transform: translateY(0);
+    box-shadow: 0 calc(2px * var(--settings-scale)) calc(6px * var(--settings-scale)) rgba(102, 126, 234, 0.3);
+}
+
+.restart-icon {
+    font-size: calc(18px * var(--settings-scale));
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.restart-app-button:hover .restart-icon {
+    transform: rotate(180deg);
+}
+
 /* Reset Button */
 .reset-button {
     padding: calc(6px * var(--settings-scale)) calc(16px * var(--settings-scale));

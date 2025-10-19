@@ -22,6 +22,9 @@ impl Default for EmojiMode {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Settings {
+    /// Global hotkey to open the main panel (e.g., "Cmd+Option+Space")
+    #[serde(default = "default_global_hotkey")]
+    pub global_hotkey: String,
     /// Whether to place the main panel under the mouse cursor when shown
     pub place_under_mouse: bool,
     /// Emoji selection mode
@@ -39,6 +42,10 @@ pub struct Settings {
     /// Scale factor for UI elements (0.5 to 2.0)
     #[serde(default = "default_scale_factor")]
     pub scale_factor: f64,
+}
+
+fn default_global_hotkey() -> String {
+    "Cmd+Option+Space".to_string()
 }
 
 fn default_window_width() -> f64 {
@@ -60,6 +67,7 @@ fn default_scale_factor() -> f64 {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            global_hotkey: default_global_hotkey(),
             place_under_mouse: true,
             emoji_mode: EmojiMode::default(),
             window_width: default_window_width(),

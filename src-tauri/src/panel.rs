@@ -116,11 +116,6 @@ pub fn hide_panel(handle: AppHandle) -> Result<(), String> {
     if panel.is_visible() {
         println!("Panel is visible, hiding panel via command");
         panel.hide();
-
-        // Try to focus settings window if it's open, otherwise restore previous app
-        if !try_focus_settings(&handle) {
-            restore_previous_app();
-        }
     } else {
         println!("Panel is already hidden, why are we trying to hide it?");
     }
@@ -189,7 +184,10 @@ pub fn toggle_panel(handle: AppHandle) -> Result<(), String> {
         .get_webview_panel("main")
         .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)).to_string())?;
 
-    if panel.is_visible() {
+    let is_visible = panel.is_visible();
+    println!("toggle_panel called, panel is_visible: {}", is_visible);
+
+    if is_visible {
         let _ = hide_panel(handle);
     } else {
         let _ = show_panel(handle);
