@@ -411,35 +411,37 @@ impl EmojiManager {
 
         // Schedule write in separate thread
         thread::spawn(move || {
-            thread::sleep(write_delay);
-
-            let should_write = {
-                let pending = match pending_writes.lock() {
-                    Ok(guard) => *guard,
-                    Err(_) => {
-                        log::warn!("Pending writes lock poisoned, assuming should write");
-                        true
-                    }
+            // Loop until we can write after a quiet period
+            loop {
+                let (pending, elapsed) = {
+                    let p = pending_writes.lock().map(|g| *g).unwrap_or(true);
+                    let e = last_write_time
+                        .lock()
+                        .map(|g| g.elapsed())
+                        .unwrap_or(write_delay);
+                    (p, e)
                 };
-                let last_write_elapsed = match last_write_time.lock() {
-                    Ok(guard) => guard.elapsed(),
-                    Err(_) => {
-                        log::warn!("Last write time lock poisoned, assuming should write");
-                        write_delay
-                    }
-                };
-                pending && last_write_elapsed >= write_delay
-            };
 
-            if should_write {
-                let ranks_data = {
-                    match data.read() {
-                        Ok(data) => data.ranks.clone(),
-                        Err(_) => {
-                            log::error!("Failed to acquire read lock for ranks during write");
-                            write_worker_active.store(false, Ordering::Release);
-                            return;
-                        }
+                if !pending {
+                    // Nothing to write; allow future scheduling
+                    write_worker_active.store(false, Ordering::Release);
+                    return;
+                }
+
+                if elapsed < write_delay {
+                    // Sleep remaining time then re-check
+                    let remaining = write_delay - elapsed;
+                    thread::sleep(remaining);
+                    continue;
+                }
+
+                // Safe to write after quiet period
+                let ranks_data = match data.read() {
+                    Ok(d) => d.ranks.clone(),
+                    Err(_) => {
+                        log::error!("Failed to acquire read lock for ranks during write");
+                        write_worker_active.store(false, Ordering::Release);
+                        return;
                     }
                 };
 
@@ -447,9 +449,10 @@ impl EmojiManager {
                     Ok(json_content) => {
                         if let Err(e) = fs::write(&ranks_file_path, json_content) {
                             log::error!("Failed to write ranks: {}", e);
+                            // Keep pending=true so a future call can retry
                         } else {
-                            if let Ok(mut pending) = pending_writes.lock() {
-                                *pending = false;
+                            if let Ok(mut p) = pending_writes.lock() {
+                                *p = false;
                             }
                             log::info!("Wrote usage ranks to file");
                         }
@@ -458,9 +461,11 @@ impl EmojiManager {
                         log::error!("Failed to serialize ranks: {}", e);
                     }
                 }
+
+                // Done for this cycle
+                write_worker_active.store(false, Ordering::Release);
+                return;
             }
-            // Mark worker inactive regardless of outcome to allow future scheduling
-            write_worker_active.store(false, Ordering::Release);
         });
     }
 
