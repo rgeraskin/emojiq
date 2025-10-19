@@ -42,7 +42,7 @@ pub struct Settings {
 }
 
 fn default_window_width() -> f64 {
-    350.0
+    338.0
 }
 
 fn default_window_height() -> f64 {

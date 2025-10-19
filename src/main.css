@@ -80,7 +80,7 @@ body {
   padding: calc(5px * var(--scale-factor));
   overflow-y: auto;
   overflow-x: hidden;
-  justify-content: space-evenly;
+  justify-content: start;
 }
 
 .emoji-button {
