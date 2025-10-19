@@ -22,10 +22,10 @@ pub async fn ensure_accessibility_permission() -> Result<(), EmojiError> {
         // Cache the positive result
         PERMISSION_GRANTED.store(true, Ordering::Relaxed);
         PERMISSION_CHECKED.store(true, Ordering::Relaxed);
-        println!("Accessibility permission already granted");
+        log::info!("Accessibility permission already granted");
         Ok(())
     } else {
-        println!("Requesting accessibility permission");
+        log::info!("Requesting accessibility permission");
         request_accessibility_permission().await;
 
         // Re-check after request

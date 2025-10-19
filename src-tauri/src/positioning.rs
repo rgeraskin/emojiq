@@ -82,7 +82,7 @@ pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), Em
 
         Ok(())
     } else {
-        println!("Failed to get native window for macOS positioning");
+        log::error!("Failed to get native window for macOS positioning");
         Err(EmojiError::WindowHandle)
     }
 }
@@ -90,7 +90,7 @@ pub fn position_window_at_cursor(window: &tauri::WebviewWindow) -> Result<(), Em
 // Function to store the currently active application
 #[cfg(target_os = "macos")]
 pub fn store_previous_app() {
-    println!("Storing previous app...");
+    log::debug!("Storing previous app...");
 
     #[cfg(target_os = "macos")]
     unsafe {
@@ -110,7 +110,7 @@ pub fn store_previous_app() {
                         if !bundle_id.is_empty() && bundle_id != APP_BUNDLE_IDENTIFIER {
                             if let Ok(mut previous_app) = PREVIOUS_APP.lock() {
                                 *previous_app = Some(bundle_id.clone());
-                                println!("Stored previous app: {}", bundle_id);
+                                log::debug!("Stored previous app: {}", bundle_id);
                             }
                         }
                     }
@@ -128,11 +128,11 @@ pub fn store_previous_app() {
 // Function to restore focus to the previously active application
 #[cfg(target_os = "macos")]
 pub fn restore_previous_app() {
-    println!("Restoring previous app...");
+    log::debug!("Restoring previous app...");
 
     if let Ok(previous_app) = PREVIOUS_APP.lock() {
         if let Some(bundle_id) = previous_app.as_ref() {
-            println!("Restoring focus to: {}", bundle_id);
+            log::debug!("Restoring focus to: {}", bundle_id);
             // Use native Cocoa APIs to activate the app on the main thread
             #[cfg(target_os = "macos")]
             {
@@ -153,16 +153,16 @@ pub fn restore_previous_app() {
                                 // NSApplicationActivateIgnoringOtherApps = 1
                                 let _: bool = msg_send![app, activateWithOptions: 1u64];
                             } else {
-                                println!("No running app found with bundle id: {}", bundle_id_owned);
+                                log::warn!("No running app found with bundle id: {}", bundle_id_owned);
                             }
                         } else {
-                            println!("No running app array for bundle id: {}", bundle_id_owned);
+                            log::warn!("No running app array for bundle id: {}", bundle_id_owned);
                         }
                     });
                 });
             }
         } else {
-            println!("No previous app stored");
+            log::debug!("No previous app stored");
         }
     }
 }

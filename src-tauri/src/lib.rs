@@ -31,20 +31,29 @@ pub struct AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Initialize logger
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .filter_module("enigo", log::LevelFilter::Warn)
+        .init();
+
+    log::info!("Starting EmojiQ application");
+
     // Use default shortcut initially; will re-register after SettingsManager loads
     let default_hotkey = constants::DEFAULT_GLOBAL_HOTKEY.to_string();
     let shortcut = match hotkey::parse_hotkey(&default_hotkey) {
         Ok(s) => s,
         Err(e) => {
-            println!(
-                "Warning: Failed to parse default hotkey '{}': {}. Fallback to default.",
-                default_hotkey, e
+            log::warn!(
+                "Failed to parse default hotkey '{}': {}. Fallback to default.",
+                default_hotkey,
+                e
             );
             hotkey::parse_hotkey(constants::DEFAULT_GLOBAL_HOTKEY).unwrap()
         }
     };
 
-    println!(
+    log::info!(
         "Registering global hotkey: {}",
         constants::DEFAULT_GLOBAL_HOTKEY
     );
@@ -69,7 +78,7 @@ pub fn run() {
                                     .shortcut_pressed
                                     .swap(false, Ordering::Relaxed);
                                 if !was_pressed {
-                                    println!("Global handler: Ignoring duplicate release");
+                                    log::warn!("Global handler: Ignoring duplicate release");
                                     return;
                                 }
                                 let handle = app.app_handle();
@@ -104,7 +113,7 @@ pub fn run() {
             let ranks_file_path: PathBuf = {
                 let mut dir = app.path().app_data_dir()?;
                 if let Err(e) = std::fs::create_dir_all(&dir) {
-                    println!("Failed to create Application Support directory: {}", e);
+                    log::error!("Failed to create Application Support directory: {}", e);
                 }
                 dir.push(constants::DEFAULT_RANKS_FILE);
                 dir
@@ -115,7 +124,7 @@ pub fn run() {
                 ranks_file_path,
             ));
             if let Err(e) = emoji_manager.initialize() {
-                println!("Warning: Failed to initialize emoji manager: {}", e);
+                log::warn!("Failed to initialize emoji manager: {}", e);
             }
 
             // Initialize settings manager with settings file under Application Support
@@ -127,7 +136,7 @@ pub fn run() {
 
             let settings_manager = Arc::new(SettingsManager::new(settings_file_path));
             if let Err(e) = settings_manager.initialize() {
-                println!("Warning: Failed to initialize settings manager: {}", e);
+                log::warn!("Failed to initialize settings manager: {}", e);
             }
 
             // Check accessibility permissions at startup only if needed for the current mode
@@ -140,8 +149,8 @@ pub fn run() {
                         match permissions::ensure_accessibility_permission().await {
                             Ok(_) => (),
                             Err(e) => {
-                                println!("⚠️  Accessibility permission issue: {}", e);
-                                println!("   App will work for browsing emojis, but pasting may not work until permission is granted.");
+                                log::warn!("Accessibility permission issue: {}", e);
+                                log::info!("App will work for browsing emojis, but pasting may not work until permission is granted.");
                             }
                         }
                     }
@@ -164,7 +173,7 @@ pub fn run() {
 
             // Register initial global shortcut (single central handler already set by plugin)
             if let Err(e) = app_handle.global_shortcut().register(shortcut.clone()) {
-                println!("Failed to register initial hotkey: {}", e);
+                log::error!("Failed to register initial hotkey: {}", e);
             }
 
             // After settings manager has loaded, re-register to saved hotkey if different
@@ -179,7 +188,7 @@ pub fn run() {
                                 if let Ok(new_shortcut) = crate::hotkey::parse_hotkey(&settings.global_hotkey) {
                                     // Unregister all, wait, register new
                                     if let Err(e) = handle_clone.global_shortcut().unregister_all() {
-                                        println!("Failed to unregister shortcuts: {}", e);
+                                        log::error!("Failed to unregister shortcuts: {}", e);
                                         return;
                                     }
                                     let delay = std::time::Duration::from_millis(
@@ -187,13 +196,13 @@ pub fn run() {
                                     );
                                     let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(delay)).await;
                                     if let Err(e) = handle_clone.global_shortcut().register(new_shortcut.clone()) {
-                                        println!("Failed to register saved hotkey: {}", e);
+                                        log::error!("Failed to register saved hotkey: {}", e);
                                         return;
                                     }
                                     if let Ok(mut guard) = state.current_shortcut.lock() {
                                         *guard = new_shortcut;
                                     }
-                                    println!(
+                                    log::info!(
                                         "Hotkey re-registered to saved setting: {}",
                                         settings.global_hotkey
                                     );

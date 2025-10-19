@@ -1,7 +1,8 @@
 use crate::constants::{
-    DEFAULT_GLOBAL_HOTKEY, DEFAULT_MAX_TOP_EMOJIS, DEFAULT_SCALE_FACTOR, DEFAULT_WINDOW_HEIGHT,
-    DEFAULT_WINDOW_WIDTH,
+    DEFAULT_GLOBAL_HOTKEY, DEFAULT_MAX_TOP_EMOJIS, DEFAULT_PLACE_UNDER_MOUSE, DEFAULT_SCALE_FACTOR,
+    DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH,
 };
+use crate::errors::EmojiError;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -30,6 +31,7 @@ pub struct Settings {
     #[serde(default = "default_global_hotkey")]
     pub global_hotkey: String,
     /// Whether to place the main panel under the mouse cursor when shown
+    #[serde(default = "default_place_under_mouse")]
     pub place_under_mouse: bool,
     /// Emoji selection mode
     #[serde(default)]
@@ -68,11 +70,15 @@ fn default_scale_factor() -> f64 {
     DEFAULT_SCALE_FACTOR
 }
 
+fn default_place_under_mouse() -> bool {
+    DEFAULT_PLACE_UNDER_MOUSE
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
             global_hotkey: default_global_hotkey(),
-            place_under_mouse: true,
+            place_under_mouse: default_place_under_mouse(),
             emoji_mode: EmojiMode::default(),
             window_width: default_window_width(),
             window_height: default_window_height(),
@@ -99,7 +105,7 @@ impl SettingsManager {
     }
 
     /// Initialize settings by loading from file or creating default
-    pub fn initialize(&self) -> Result<(), String> {
+    pub fn initialize(&self) -> Result<(), EmojiError> {
         if self.settings_file_path.exists() {
             self.load()?;
         } else {
@@ -110,54 +116,48 @@ impl SettingsManager {
     }
 
     /// Load settings from file
-    fn load(&self) -> Result<(), String> {
-        let content = fs::read_to_string(&self.settings_file_path)
-            .map_err(|e| format!("Failed to read settings file: {}", e))?;
-
-        let loaded_settings: Settings = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse settings file: {}", e))?;
+    fn load(&self) -> Result<(), EmojiError> {
+        let content = fs::read_to_string(&self.settings_file_path)?;
+        let loaded_settings: Settings = serde_json::from_str(&content)?;
 
         let mut settings = self
             .settings
             .lock()
-            .map_err(|e| format!("Failed to lock settings: {}", e))?;
+            .map_err(|e| EmojiError::Lock(format!("Failed to lock settings: {}", e)))?;
         *settings = loaded_settings;
 
         Ok(())
     }
 
     /// Save settings to file
-    pub fn save(&self) -> Result<(), String> {
+    pub fn save(&self) -> Result<(), EmojiError> {
         let settings = self
             .settings
             .lock()
-            .map_err(|e| format!("Failed to lock settings: {}", e))?;
+            .map_err(|e| EmojiError::Lock(format!("Failed to lock settings: {}", e)))?;
 
-        let json = serde_json::to_string_pretty(&*settings)
-            .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-
-        fs::write(&self.settings_file_path, json)
-            .map_err(|e| format!("Failed to write settings file: {}", e))?;
+        let json = serde_json::to_string_pretty(&*settings)?;
+        fs::write(&self.settings_file_path, json)?;
 
         Ok(())
     }
 
     /// Get current settings
-    pub fn get(&self) -> Result<Settings, String> {
+    pub fn get(&self) -> Result<Settings, EmojiError> {
         let settings = self
             .settings
             .lock()
-            .map_err(|e| format!("Failed to lock settings: {}", e))?;
+            .map_err(|e| EmojiError::Lock(format!("Failed to lock settings: {}", e)))?;
         Ok(settings.clone())
     }
 
     /// Update settings
-    pub fn update(&self, new_settings: Settings) -> Result<(), String> {
+    pub fn update(&self, new_settings: Settings) -> Result<(), EmojiError> {
         {
             let mut settings = self
                 .settings
                 .lock()
-                .map_err(|e| format!("Failed to lock settings: {}", e))?;
+                .map_err(|e| EmojiError::Lock(format!("Failed to lock settings: {}", e)))?;
             *settings = new_settings;
         }
         self.save()?;
@@ -165,13 +165,13 @@ impl SettingsManager {
     }
 
     /// Get a specific setting value
-    pub fn get_place_under_mouse(&self) -> Result<bool, String> {
+    pub fn get_place_under_mouse(&self) -> Result<bool, EmojiError> {
         let settings = self.get()?;
         Ok(settings.place_under_mouse)
     }
 
     /// Set the place_under_mouse setting
-    pub fn set_place_under_mouse(&self, value: bool) -> Result<(), String> {
+    pub fn set_place_under_mouse(&self, value: bool) -> Result<(), EmojiError> {
         let mut settings = self.get()?;
         settings.place_under_mouse = value;
         self.update(settings)?;
@@ -179,7 +179,7 @@ impl SettingsManager {
     }
 
     /// Update window size in settings
-    pub fn update_window_size(&self, width: f64, height: f64) -> Result<(), String> {
+    pub fn update_window_size(&self, width: f64, height: f64) -> Result<(), EmojiError> {
         let mut settings = self.get()?;
         settings.window_width = width;
         settings.window_height = height;

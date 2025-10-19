@@ -38,7 +38,9 @@ tauri_panel! {
 }
 
 pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
-    let window: WebviewWindow = app_handle.get_webview_window("main").unwrap();
+    let window: WebviewWindow = app_handle
+        .get_webview_window("main")
+        .ok_or_else(|| tauri::Error::WindowNotFound)?;
 
     // Restore window size from settings
     if let Some(state) = app_handle.try_state::<crate::AppState>() {
@@ -50,7 +52,12 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
         }
     }
 
-    let panel = window.to_panel::<EmojiqPanel>().unwrap();
+    let panel = window.to_panel::<EmojiqPanel>().map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to convert to panel: {:?}", e),
+        )
+    })?;
     let _ = hide_panel(app_handle.clone());
 
     // Prevent panel from activating the app (required for fullscreen display)
@@ -82,7 +89,7 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     let panel_for_handler = panel.clone();
     let handle_for_handler = app_handle.clone();
     handler.window_did_resign_key(move |_notification| {
-        println!("Panel lost focus, hiding panel");
+        log::debug!("Panel lost focus, hiding panel");
         panel_for_handler.hide();
         // Restore nonactivating_panel for fullscreen compatibility
         panel_for_handler.set_style_mask(StyleMask::empty().nonactivating_panel().into());
@@ -108,21 +115,21 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-pub fn hide_panel(handle: AppHandle) -> Result<(), String> {
+pub fn hide_panel(handle: AppHandle) -> Result<(), EmojiError> {
     let panel = handle
         .get_webview_panel("main")
-        .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)).to_string())?;
+        .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)))?;
 
     if panel.is_visible() {
-        println!("Panel is visible, hiding panel via command");
+        log::debug!("Panel is visible, hiding panel via command");
         panel.hide();
     } else {
-        println!("Panel is already hidden, why are we trying to hide it?");
+        log::warn!("Panel is already hidden, why are we trying to hide it?");
     }
     Ok(())
 }
 
-pub fn show_panel(handle: AppHandle) -> Result<(), String> {
+pub fn show_panel(handle: AppHandle) -> Result<(), EmojiError> {
     // Check if settings window is currently open and focused
     // If so, don't store the previous app - we'll return focus to settings instead
     let settings_is_open = handle
@@ -152,40 +159,34 @@ pub fn show_panel(handle: AppHandle) -> Result<(), String> {
         // Position panel BEFORE showing the panel (if enabled)
         if should_position_at_cursor {
             if let Err(e) = position_window_at_cursor(&window) {
-                println!(
-                    "Warning: Failed to position panel at cursor: {}. Using default positioning.",
+                log::warn!(
+                    "Failed to position panel at cursor: {}. Using default positioning.",
                     e
                 );
             }
         } else {
-            println!("Positioning at cursor disabled, using default positioning");
+            log::debug!("Positioning at cursor disabled, using default positioning");
         }
 
         // Show panel after positioning is complete
-        let panel = handle.get_webview_panel("main").map_err(|e| {
-            EmojiError::Panel(format!("Failed to get main panel: {:?}", e)).to_string()
-        })?;
+        let panel = handle
+            .get_webview_panel("main")
+            .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)))?;
         panel.show_and_make_key();
-
-        // Debug focus state
-        // match window.is_focused() {
-        //     Ok(focused) => println!("Window focus state: {}", focused),
-        //     Err(e) => println!("Failed to check focus state: {:?}", e),
-        // }
 
         Ok(())
     } else {
-        Err(EmojiError::Panel("Failed to get main window".to_string()).to_string())
+        Err(EmojiError::Panel("Failed to get main window".to_string()))
     }
 }
 
-pub fn toggle_panel(handle: AppHandle) -> Result<(), String> {
+pub fn toggle_panel(handle: AppHandle) -> Result<(), EmojiError> {
     let panel = handle
         .get_webview_panel("main")
-        .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)).to_string())?;
+        .map_err(|e| EmojiError::Panel(format!("Failed to get main panel: {:?}", e)))?;
 
     let is_visible = panel.is_visible();
-    println!("toggle_panel called, panel is_visible: {}", is_visible);
+    log::debug!("toggle_panel called, panel is_visible: {}", is_visible);
 
     if is_visible {
         let _ = hide_panel(handle);

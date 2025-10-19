@@ -16,14 +16,14 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "settings" => {
                 if let Err(e) = open_settings_window(app) {
-                    println!("Failed to open settings window: {}", e);
+                    log::error!("Failed to open settings window: {}", e);
                 }
             }
             "quit" => {
                 app.exit(0);
             }
             _ => {
-                println!("menu item {:?} not handled", event.id);
+                log::warn!("menu item {:?} not handled", event.id);
             }
         })
         .build(app_handle)?;

@@ -23,6 +23,7 @@ pub const DEFAULT_SETTINGS_FILE: &str = "settings.json";
 
 // Settings defaults and limits
 pub const DEFAULT_GLOBAL_HOTKEY: &str = "Cmd+Option+Space";
+pub const DEFAULT_PLACE_UNDER_MOUSE: bool = true;
 pub const DEFAULT_WINDOW_WIDTH: f64 = 338.0;
 pub const DEFAULT_WINDOW_HEIGHT: f64 = 290.0;
 pub const DEFAULT_MAX_TOP_EMOJIS: usize = 10;

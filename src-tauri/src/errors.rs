@@ -1,13 +1,14 @@
+use serde::Serialize;
 use thiserror::Error;
 
 /// Unified error type for the application
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Serialize)]
 pub enum EmojiError {
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(String),
 
     #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(String),
 
     #[error("Lock error: {0}")]
     Lock(String),
@@ -40,6 +41,18 @@ pub enum EmojiError {
 impl From<EmojiError> for String {
     fn from(error: EmojiError) -> Self {
         error.to_string()
+    }
+}
+
+impl From<std::io::Error> for EmojiError {
+    fn from(error: std::io::Error) -> Self {
+        EmojiError::Io(error.to_string())
+    }
+}
+
+impl From<serde_json::Error> for EmojiError {
+    fn from(error: serde_json::Error) -> Self {
+        EmojiError::Json(error.to_string())
     }
 }
 

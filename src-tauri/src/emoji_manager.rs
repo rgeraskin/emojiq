@@ -92,7 +92,7 @@ impl EmojiManager {
             return Ok(());
         }
 
-        println!("Initializing emoji manager...");
+        log::info!("Initializing emoji manager...");
 
         self.load_emojis()?;
         self.load_ranks()?;
@@ -100,7 +100,7 @@ impl EmojiManager {
         self.build_index()?;
 
         self.init_success.store(true, Ordering::Release);
-        println!("Emoji manager initialized successfully");
+        log::info!("Emoji manager initialized successfully");
         Ok(())
     }
 
@@ -120,7 +120,7 @@ impl EmojiManager {
             match fs::read_to_string(&self.emoji_file_path) {
                 Ok(content) => content,
                 Err(_) => {
-                    println!("Could not read emoji file from filesystem, using embedded data");
+                    log::info!("Could not read emoji file from filesystem, using embedded data");
                     include_str!("emoji.json").to_string()
                 }
             }
@@ -136,7 +136,7 @@ impl EmojiManager {
             let mut data = self.data.write().map_lock_err()?;
             data.emojis = emoji_data;
             data.emojis_loaded = true;
-            println!("Loaded {} emojis", data.emojis.len());
+            log::info!("Loaded {} emojis", data.emojis.len());
         }
 
         Ok(())
@@ -164,7 +164,7 @@ impl EmojiManager {
             let mut data = self.data.write().map_lock_err()?;
             data.ranks = ranks_data;
             data.ranks_loaded = true;
-            println!("Loaded {} ranks", data.ranks.len());
+            log::info!("Loaded {} ranks", data.ranks.len());
         }
 
         Ok(())
@@ -176,7 +176,7 @@ impl EmojiManager {
         {
             let data = self.data.read().map_lock_err()?;
             if data.keywords_built {
-                println!("Keywords already built, skipping");
+                log::debug!("Keywords already built, skipping");
                 return Ok(());
             }
         }
@@ -235,7 +235,7 @@ impl EmojiManager {
             let mut data = self.data.write().map_lock_err()?;
             data.keywords = keywords_map;
             data.keywords_built = true;
-            println!("Built keywords for {} emojis", data.keywords.len());
+            log::info!("Built keywords for {} emojis", data.keywords.len());
         }
 
         Ok(())
@@ -247,7 +247,7 @@ impl EmojiManager {
         {
             let data = self.data.read().map_lock_err()?;
             if data.index_built {
-                println!("Index already built, skipping");
+                log::debug!("Index already built, skipping");
                 return Ok(());
             }
         }
@@ -315,7 +315,7 @@ impl EmojiManager {
             let mut data = self.data.write().map_lock_err()?;
             data.index = index_map;
             data.index_built = true;
-            println!("Built index for {} matches", data.index.len());
+            log::info!("Built index for {} matches", data.index.len());
         }
 
         Ok(())
@@ -324,7 +324,7 @@ impl EmojiManager {
     /// Get top emojis from ranks data
     fn get_top_emojis_from_ranks(&self, ranks: &HashMap<String, u32>, limit: usize) -> Vec<String> {
         if ranks.is_empty() {
-            println!("No ranks found");
+            log::debug!("No ranks found");
             return Vec::new();
         }
 
@@ -345,13 +345,13 @@ impl EmojiManager {
         let data = match self.data.read() {
             Ok(data) => data,
             Err(_) => {
-                println!("Failed to acquire read lock for ranks, returning emojis as-is");
+                log::warn!("Failed to acquire read lock for ranks, returning emojis as-is");
                 return emojis;
             }
         };
 
         if data.ranks.is_empty() {
-            println!("No ranks found, returning emojis as-is");
+            log::debug!("No ranks found, returning emojis as-is");
             return emojis;
         }
 
@@ -417,14 +417,14 @@ impl EmojiManager {
                 let pending = match pending_writes.lock() {
                     Ok(guard) => *guard,
                     Err(_) => {
-                        println!("Pending writes lock poisoned, assuming should write");
+                        log::warn!("Pending writes lock poisoned, assuming should write");
                         true
                     }
                 };
                 let last_write_elapsed = match last_write_time.lock() {
                     Ok(guard) => guard.elapsed(),
                     Err(_) => {
-                        println!("Last write time lock poisoned, assuming should write");
+                        log::warn!("Last write time lock poisoned, assuming should write");
                         write_delay
                     }
                 };
@@ -436,7 +436,7 @@ impl EmojiManager {
                     match data.read() {
                         Ok(data) => data.ranks.clone(),
                         Err(_) => {
-                            eprintln!("Failed to acquire read lock for ranks during write");
+                            log::error!("Failed to acquire read lock for ranks during write");
                             write_worker_active.store(false, Ordering::Release);
                             return;
                         }
@@ -446,16 +446,16 @@ impl EmojiManager {
                 match serde_json::to_string(&ranks_data) {
                     Ok(json_content) => {
                         if let Err(e) = fs::write(&ranks_file_path, json_content) {
-                            eprintln!("Failed to write ranks: {}", e);
+                            log::error!("Failed to write ranks: {}", e);
                         } else {
                             if let Ok(mut pending) = pending_writes.lock() {
                                 *pending = false;
                             }
-                            println!("Wrote usage ranks to file");
+                            log::info!("Wrote usage ranks to file");
                         }
                     }
                     Err(e) => {
-                        eprintln!("Failed to serialize ranks: {}", e);
+                        log::error!("Failed to serialize ranks: {}", e);
                     }
                 }
             }
@@ -470,11 +470,11 @@ impl EmojiManager {
         filter_word: &str,
         max_top_emojis: usize,
     ) -> Result<Vec<String>, EmojiError> {
-        println!("get_emojis called with filter: '{}'", filter_word);
+        log::debug!("get_emojis called with filter: '{}'", filter_word);
         let filter_word = filter_word.trim().to_lowercase();
 
         let emoji_list: Vec<String> = if filter_word.len() < MIN_SEARCH_LENGTH {
-            println!("Getting all emojis (filter too short)");
+            log::debug!("Getting all emojis (filter too short)");
             // Return all emojis when filter is too short, limited by MAX_SEARCH_RESULTS to avoid overwhelming UI
             let data = self.data.read().map_lock_err()?;
 
@@ -484,7 +484,7 @@ impl EmojiManager {
                 .map(|e| e.emoji.clone())
                 .collect()
         } else {
-            println!("Getting emojis for filter word: '{}'", filter_word);
+            log::debug!("Getting emojis for filter word: '{}'", filter_word);
             // Index is already built at startup, now using emoji indices
             let data = self.data.read().map_lock_err()?;
 
@@ -507,7 +507,7 @@ impl EmojiManager {
             self.order_emojis_by_usage(emoji_list, max_top_emojis)
         };
 
-        println!("Returning {} emojis", ordered_emojis.len());
+        log::debug!("Returning {} emojis", ordered_emojis.len());
         Ok(ordered_emojis)
     }
 
@@ -527,7 +527,7 @@ impl EmojiManager {
 
     /// Increment usage count for an emoji
     pub fn increment_usage(&self, emoji: &str) -> Result<(), EmojiError> {
-        println!("Incrementing usage for emoji: '{}'", emoji);
+        log::debug!("Incrementing usage for emoji: '{}'", emoji);
 
         // Ranks are already loaded at startup
         {
@@ -544,15 +544,15 @@ impl EmojiManager {
 
     /// Remove a specific emoji from usage ranks
     pub fn remove_emoji_rank(&self, emoji: &str) -> Result<(), EmojiError> {
-        println!("Removing emoji rank for: '{}'", emoji);
+        log::info!("Removing emoji rank for: '{}'", emoji);
 
         // Remove emoji from ranks data
         {
             let mut data = self.data.write().map_lock_err()?;
             if data.ranks.remove(emoji).is_some() {
-                println!("Removed emoji rank for: '{}'", emoji);
+                log::info!("Removed emoji rank for: '{}'", emoji);
             } else {
-                println!("Emoji rank not found for: '{}'", emoji);
+                log::debug!("Emoji rank not found for: '{}'", emoji);
             }
         }
 
@@ -564,7 +564,7 @@ impl EmojiManager {
 
     /// Reset all emoji usage ranks
     pub fn reset_ranks(&self) -> Result<(), EmojiError> {
-        println!("Resetting all emoji ranks");
+        log::info!("Resetting all emoji ranks");
 
         // Clear ranks data
         {
@@ -577,7 +577,7 @@ impl EmojiManager {
         let json_content = serde_json::to_string(&ranks_data)?;
         fs::write(&self.ranks_file_path, json_content)?;
 
-        println!("All emoji ranks have been reset");
+        log::info!("All emoji ranks have been reset");
         Ok(())
     }
 }
