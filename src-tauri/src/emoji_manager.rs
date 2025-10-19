@@ -542,6 +542,26 @@ impl EmojiManager {
         Ok(())
     }
 
+    /// Remove a specific emoji from usage ranks
+    pub fn remove_emoji_rank(&self, emoji: &str) -> Result<(), EmojiError> {
+        println!("Removing emoji rank for: '{}'", emoji);
+
+        // Remove emoji from ranks data
+        {
+            let mut data = self.data.write().map_lock_err()?;
+            if data.ranks.remove(emoji).is_some() {
+                println!("Removed emoji rank for: '{}'", emoji);
+            } else {
+                println!("Emoji rank not found for: '{}'", emoji);
+            }
+        }
+
+        // Schedule batched write
+        self.schedule_write();
+
+        Ok(())
+    }
+
     /// Reset all emoji usage ranks
     pub fn reset_ranks(&self) -> Result<(), EmojiError> {
         println!("Resetting all emoji ranks");

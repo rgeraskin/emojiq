@@ -94,10 +94,17 @@ function setupEventListeners() {
 }
 
 // Event delegation handlers
-function handleEmojiClick(e) {
+async function handleEmojiClick(e) {
   if (e.target.classList.contains('emoji-button')) {
     const emoji = e.target.dataset.emoji || e.target.textContent;
-    selectEmoji(emoji);
+
+    // Check if Cmd key (metaKey) is pressed
+    if (e.metaKey) {
+      e.preventDefault();
+      await removeEmojiFromMostUsed(emoji);
+    } else {
+      selectEmoji(emoji);
+    }
   }
 }
 
@@ -382,6 +389,20 @@ async function selectEmoji(emoji) {
     updateStatus('Error pasting emoji o_0');
   }
   await renderPanel();
+}
+
+// Remove emoji from most used
+async function removeEmojiFromMostUsed(emoji) {
+  console.log("removeEmojiFromMostUsed:", emoji);
+  try {
+    await invoke("remove_emoji_rank", { emoji: emoji });
+    updateStatus(`Removed ${emoji} from most used`);
+    // Reload emojis to reflect the change
+    await loadEmojis(currentFilter);
+  } catch (error) {
+    console.error('Error removing emoji from most used:', error);
+    updateStatus('Error removing emoji o_0');
+  }
 }
 
 // Update status bar

@@ -41,6 +41,7 @@ pub fn run() {
             command::get_emojis,
             command::get_keywords,
             command::increment_usage,
+            command::remove_emoji_rank,
             command::reset_emoji_ranks,
             command::get_settings,
             command::update_settings,
