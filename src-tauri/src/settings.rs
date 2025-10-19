@@ -1,3 +1,7 @@
+use crate::constants::{
+    DEFAULT_GLOBAL_HOTKEY, DEFAULT_MAX_TOP_EMOJIS, DEFAULT_SCALE_FACTOR, DEFAULT_WINDOW_HEIGHT,
+    DEFAULT_WINDOW_WIDTH,
+};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -45,23 +49,23 @@ pub struct Settings {
 }
 
 fn default_global_hotkey() -> String {
-    "Cmd+Option+Space".to_string()
+    DEFAULT_GLOBAL_HOTKEY.to_string()
 }
 
 fn default_window_width() -> f64 {
-    338.0
+    DEFAULT_WINDOW_WIDTH
 }
 
 fn default_window_height() -> f64 {
-    290.0
+    DEFAULT_WINDOW_HEIGHT
 }
 
 fn default_max_top_emojis() -> usize {
-    10
+    DEFAULT_MAX_TOP_EMOJIS
 }
 
 fn default_scale_factor() -> f64 {
-    1.0
+    DEFAULT_SCALE_FACTOR
 }
 
 impl Default for Settings {

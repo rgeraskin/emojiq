@@ -284,31 +284,7 @@ input:checked+.slider:before {
     background: #f0f4ff;
 }
 
-.status-message {
-    padding: calc(6px * var(--settings-scale)) calc(16px * var(--settings-scale));
-    border-radius: calc(8px * var(--settings-scale));
-    font-size: calc(13px * var(--settings-scale));
-    text-align: center;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    min-height: calc(32px * var(--settings-scale));
-}
-
-.status-message.show {
-    opacity: 1;
-}
-
-.status-message.success {
-    background: #d4edda;
-    color: #155724;
-    border: calc(1px * var(--settings-scale)) solid #c3e6cb;
-}
-
-.status-message.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: calc(1px * var(--settings-scale)) solid #f5c6cb;
-}
+/* Removed unused .status-message styles */
 
 /* Scale Control */
 .scale-control {
@@ -460,45 +436,7 @@ input:checked+.slider:before {
 }
 
 /* Restart App Button */
-.restart-app-button {
-    margin-top: calc(12px * var(--settings-scale));
-    padding: calc(10px * var(--settings-scale)) calc(20px * var(--settings-scale));
-    background: #667eea;
-    color: #ffffff;
-    border: none;
-    border-radius: calc(8px * var(--settings-scale));
-    font-size: calc(14px * var(--settings-scale));
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: calc(8px * var(--settings-scale));
-    user-select: none;
-    width: 100%;
-}
-
-.restart-app-button:hover {
-    background: #5568d3;
-    box-shadow: 0 calc(4px * var(--settings-scale)) calc(12px * var(--settings-scale)) rgba(102, 126, 234, 0.3);
-    transform: translateY(calc(-2px * var(--settings-scale)));
-}
-
-.restart-app-button:active {
-    transform: translateY(0);
-    box-shadow: 0 calc(2px * var(--settings-scale)) calc(6px * var(--settings-scale)) rgba(102, 126, 234, 0.3);
-}
-
-.restart-icon {
-    font-size: calc(18px * var(--settings-scale));
-    display: inline-block;
-    transition: transform 0.3s ease;
-}
-
-.restart-app-button:hover .restart-icon {
-    transform: rotate(180deg);
-}
+/* Removed unused restart button/icon styles */
 
 /* Reset Button */
 .reset-button {

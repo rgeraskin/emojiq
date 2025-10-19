@@ -1,7 +1,7 @@
 const { invoke } = window.__TAURI__.core;
 const { getCurrentWindow } = window.__TAURI__.window;
 const { open } = window.__TAURI__.shell;
-const { ask, message } = window.__TAURI__.dialog;
+const { ask } = window.__TAURI__.dialog;
 
 let hotkeyInput;
 let hotkeyReset;

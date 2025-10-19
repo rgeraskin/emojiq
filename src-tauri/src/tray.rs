@@ -1,3 +1,4 @@
+use crate::constants::{SETTINGS_WINDOW_HEIGHT, SETTINGS_WINDOW_WIDTH};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -40,7 +41,7 @@ pub fn open_settings_window(app: &AppHandle) -> tauri::Result<()> {
     let window =
         WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
             .title("Settings - emojiq")
-            .inner_size(400.0, 755.0)
+            .inner_size(SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOW_HEIGHT)
             .resizable(false)
             .center()
             .focused(true)

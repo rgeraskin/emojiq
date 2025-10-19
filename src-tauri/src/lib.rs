@@ -1,5 +1,5 @@
 mod command;
-mod constants;
+pub mod constants;
 pub mod emoji_manager;
 mod errors;
 mod hotkey;
@@ -31,43 +31,23 @@ pub struct AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Pre-initialize to get hotkey setting before building the app
-    let hotkey_str = {
-        // We need to determine the settings file path before the app is built
-        // This is a bit of a workaround, but necessary for global shortcut registration
-        let home_dir = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        let settings_file = PathBuf::from(home_dir)
-            .join("Library/Application Support/dev.rgeraskin.emojiq")
-            .join(constants::DEFAULT_SETTINGS_FILE);
-
-        if settings_file.exists() {
-            if let Ok(content) = std::fs::read_to_string(&settings_file) {
-                if let Ok(settings) = serde_json::from_str::<settings::Settings>(&content) {
-                    settings.global_hotkey
-                } else {
-                    settings::Settings::default().global_hotkey
-                }
-            } else {
-                settings::Settings::default().global_hotkey
-            }
-        } else {
-            settings::Settings::default().global_hotkey
-        }
-    };
-
-    // Parse the hotkey string
-    let shortcut = match hotkey::parse_hotkey(&hotkey_str) {
+    // Use default shortcut initially; will re-register after SettingsManager loads
+    let default_hotkey = constants::DEFAULT_GLOBAL_HOTKEY.to_string();
+    let shortcut = match hotkey::parse_hotkey(&default_hotkey) {
         Ok(s) => s,
         Err(e) => {
             println!(
-                "Warning: Failed to parse hotkey '{}': {}. Using default.",
-                hotkey_str, e
+                "Warning: Failed to parse default hotkey '{}': {}. Fallback to default.",
+                default_hotkey, e
             );
-            hotkey::parse_hotkey("Cmd+Option+Space").unwrap()
+            hotkey::parse_hotkey(constants::DEFAULT_GLOBAL_HOTKEY).unwrap()
         }
     };
 
-    println!("Registering global hotkey: {}", hotkey_str);
+    println!(
+        "Registering global hotkey: {}",
+        constants::DEFAULT_GLOBAL_HOTKEY
+    );
 
     tauri::Builder::default()
         .plugin(tauri_plugin_macos_permissions::init())
@@ -185,6 +165,43 @@ pub fn run() {
             // Register initial global shortcut (single central handler already set by plugin)
             if let Err(e) = app_handle.global_shortcut().register(shortcut.clone()) {
                 println!("Failed to register initial hotkey: {}", e);
+            }
+
+            // After settings manager has loaded, re-register to saved hotkey if different
+            {
+                let handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    // Read desired hotkey from settings
+                    if let Some(state) = handle_clone.try_state::<crate::AppState>() {
+                        if let Ok(settings) = state.settings_manager.get() {
+                            if settings.global_hotkey != constants::DEFAULT_GLOBAL_HOTKEY {
+                                // Parse new shortcut
+                                if let Ok(new_shortcut) = crate::hotkey::parse_hotkey(&settings.global_hotkey) {
+                                    // Unregister all, wait, register new
+                                    if let Err(e) = handle_clone.global_shortcut().unregister_all() {
+                                        println!("Failed to unregister shortcuts: {}", e);
+                                        return;
+                                    }
+                                    let delay = std::time::Duration::from_millis(
+                                        crate::constants::HOTKEY_UNREGISTER_WAIT_MS,
+                                    );
+                                    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(delay)).await;
+                                    if let Err(e) = handle_clone.global_shortcut().register(new_shortcut.clone()) {
+                                        println!("Failed to register saved hotkey: {}", e);
+                                        return;
+                                    }
+                                    if let Ok(mut guard) = state.current_shortcut.lock() {
+                                        *guard = new_shortcut;
+                                    }
+                                    println!(
+                                        "Hotkey re-registered to saved setting: {}",
+                                        settings.global_hotkey
+                                    );
+                                }
+                            }
+                        }
+                    }
+                });
             }
 
             Ok(())

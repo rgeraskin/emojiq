@@ -134,7 +134,11 @@ body {
 .status-bar-keywords {
   text-align: left;
   min-height: calc(32px * var(--scale-factor));
-  max-lines: 3;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   white-space: pre-wrap;
   /* overflow: hidden;
   text-overflow: ellipsis; */

@@ -1,4 +1,7 @@
-use crate::constants::FOCUS_RESTORATION_DELAY_MS;
+use crate::constants::{
+    FOCUS_RESTORATION_DELAY_MS, HOTKEY_UNREGISTER_WAIT_MS, MAX_SCALE_FACTOR, MAX_TOP_EMOJIS_LIMIT,
+    MIN_SCALE_FACTOR,
+};
 use crate::hotkey;
 use crate::panel;
 use crate::permissions::{ensure_accessibility_permission, reset_permission_cache};
@@ -7,7 +10,6 @@ use crate::tray;
 use crate::AppState;
 use enigo::{Enigo, Keyboard, Settings};
 use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_nspanel::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
@@ -147,23 +149,45 @@ pub fn get_settings(state: State<AppState>) -> Result<AppSettings, String> {
 }
 
 #[tauri::command]
-pub fn update_settings(
+pub async fn update_settings(
     handle: AppHandle,
-    state: State<AppState>,
+    state: State<'_, AppState>,
     settings: AppSettings,
 ) -> Result<(), String> {
+    // Sanitize settings: clamp scale factor and max_top_emojis, validate hotkey
+    let mut new_settings = settings;
+
+    // Clamp values
+    if new_settings.scale_factor < MIN_SCALE_FACTOR {
+        new_settings.scale_factor = MIN_SCALE_FACTOR;
+    } else if new_settings.scale_factor > MAX_SCALE_FACTOR {
+        new_settings.scale_factor = MAX_SCALE_FACTOR;
+    }
+
+    if new_settings.max_top_emojis > MAX_TOP_EMOJIS_LIMIT {
+        new_settings.max_top_emojis = MAX_TOP_EMOJIS_LIMIT;
+    }
+
+    // Validate hotkey string by parsing
+    if let Err(e) = crate::hotkey::parse_hotkey(&new_settings.global_hotkey) {
+        return Err(format!(
+            "Invalid hotkey '{}': {}",
+            new_settings.global_hotkey, e
+        ));
+    }
+
     // Check if hotkey has changed
     let old_settings = state.settings_manager.get()?;
-    let hotkey_changed = old_settings.global_hotkey != settings.global_hotkey;
+    let hotkey_changed = old_settings.global_hotkey != new_settings.global_hotkey;
 
     if hotkey_changed {
         println!(
             "Hotkey changed from '{}' to '{}'",
-            old_settings.global_hotkey, settings.global_hotkey
+            old_settings.global_hotkey, new_settings.global_hotkey
         );
     }
 
-    state.settings_manager.update(settings)?;
+    state.settings_manager.update(new_settings.clone())?;
 
     // Notify main window to refresh emoji list if it exists
     if let Some(main_window) = handle.get_webview_window("main") {
@@ -173,7 +197,7 @@ pub fn update_settings(
     // Re-register hotkey if it changed
     if hotkey_changed {
         println!("Hotkey changed, re-registering...");
-        if let Err(e) = reregister_hotkey(handle.clone(), state) {
+        if let Err(e) = reregister_hotkey(handle.clone(), state).await {
             println!("Failed to re-register hotkey: {}", e);
         }
     }
@@ -182,24 +206,16 @@ pub fn update_settings(
 }
 
 #[tauri::command]
-pub fn open_settings(handle: AppHandle, state: State<AppState>) -> Result<(), String> {
+pub fn open_settings(handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     // Set flag to indicate we're opening settings
     state
         .opening_settings
         .store(true, std::sync::atomic::Ordering::Release);
 
-    // Hide the main panel first if it's open to avoid focus conflicts
-    if let Ok(panel) = handle.get_webview_panel("main") {
-        if panel.is_visible() {
-            panel.hide();
-            // Small delay to ensure panel is fully hidden before opening settings
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
-    }
-
+    // Open settings window first to ensure UI remains visible; then hide panel
     let result = tray::open_settings_window(&handle).map_err(|e| e.to_string());
 
-    // Clear the flag after settings window is opened
+    // Clear the flag after settings window is opened/attempted
     state
         .opening_settings
         .store(false, std::sync::atomic::Ordering::Release);
@@ -213,7 +229,10 @@ pub fn save_window_size(state: State<AppState>, width: f64, height: f64) -> Resu
 }
 
 #[tauri::command]
-pub fn reregister_hotkey(handle: AppHandle, state: State<AppState>) -> Result<(), String> {
+pub async fn reregister_hotkey(
+    handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     println!("Re-registering hotkey...");
 
     // Make sure panel is hidden before re-registering
@@ -237,7 +256,8 @@ pub fn reregister_hotkey(handle: AppHandle, state: State<AppState>) -> Result<()
 
     // Longer delay to ensure OS processes the unregistration
     println!("Waiting for unregistration to complete...");
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    let delay = std::time::Duration::from_millis(HOTKEY_UNREGISTER_WAIT_MS);
+    let _ = tauri::async_runtime::spawn_blocking(move || std::thread::sleep(delay)).await;
 
     // Register the new shortcut (single global handler will handle events)
     println!("Registering new hotkey: {}", new_hotkey_str);

@@ -356,7 +356,7 @@ fn test_optimized_search_performance() {
 
     // Test that search results are limited
     let result = manager.get_emojis("an", 10).unwrap(); // Longer filter
-    assert!(result.len() <= 50); // Should be limited by MAX_SEARCH_RESULTS
+    assert!(result.len() <= emojiq_lib::constants::MAX_SEARCH_RESULTS); // Should be limited
 }
 
 #[test]

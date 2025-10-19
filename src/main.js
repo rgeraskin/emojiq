@@ -5,6 +5,9 @@ const CONFIG = {
   EMOJI_BATCH_SIZE: 100,
   SEARCH_DEBOUNCE_MS: 150,
   BUTTON_FOCUS_DELAY_MS: 100,
+  MIN_WINDOW_WIDTH: 120,
+  MIN_WINDOW_HEIGHT: 120,
+  WINDOW_RESIZE_DEBOUNCE_MS: 500,
 };
 
 // Polyfill for requestIdleCallback if not available (Tauri webview compatibility)
@@ -21,8 +24,6 @@ const statusBar = document.getElementById('statusBar');
 let gridEmojis = [];
 let currentFilter = '';
 let previousElementIndex = 0;
-let emojiCache = new Map(); // Cache for rendered emoji buttons
-let currentBatch = 0;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async function () {
@@ -74,10 +75,14 @@ function setupEventListeners() {
       return;
     }
 
-    // Cmd+, to open settings
+    // Cmd+, to open settings (only when main panel is focused)
     if (e.key === ',' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
       e.preventDefault();
-      await invoke("open_settings");
+      try {
+        await invoke("open_settings");
+      } catch (err) {
+        console.error('Failed to open settings from main panel:', err);
+      }
       return;
     }
 
@@ -428,7 +433,7 @@ function setupWindowResizeHandler() {
       } catch (error) {
         console.error('Failed to save window size:', error);
       }
-    }, 500);
+    }, CONFIG.WINDOW_RESIZE_DEBOUNCE_MS);
   });
 
   // Implement custom resize handle for NSPanel
@@ -457,8 +462,8 @@ function setupWindowResizeHandler() {
         const deltaX = moveEvent.clientX - startX;
         const deltaY = moveEvent.clientY - startY;
 
-        const newWidth = Math.max(120, startWidth + deltaX);
-        const newHeight = Math.max(120, startHeight + deltaY);
+        const newWidth = Math.max(CONFIG.MIN_WINDOW_WIDTH, startWidth + deltaX);
+        const newHeight = Math.max(CONFIG.MIN_WINDOW_HEIGHT, startHeight + deltaY);
 
         currentWindow.setSize({ type: 'Logical', width: newWidth, height: newHeight })
           .catch(error => console.error('Failed to resize window:', error));
