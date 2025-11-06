@@ -134,15 +134,7 @@ body {
 .status-bar-keywords {
   text-align: left;
   min-height: calc(32px * var(--scale-factor));
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   white-space: pre-wrap;
-  /* overflow: hidden;
-  text-overflow: ellipsis; */
-  /* Change from nowrap to pre-wrap to preserve newlines */
 }
 
 /* Scrollbar styling */
