@@ -94,8 +94,8 @@ pub fn get_keywords(state: State<AppState>, emoji: String) -> Result<Vec<String>
 }
 
 #[tauri::command]
-pub fn increment_usage(state: State<AppState>, emoji: String) -> Result<(), EmojiError> {
-    state.emoji_manager.increment_usage(&emoji)
+pub fn increment_usage(state: State<AppState>, emoji: String, amount: Option<u32>) -> Result<(), EmojiError> {
+    state.emoji_manager.increment_usage(&emoji, amount)
 }
 
 #[tauri::command]

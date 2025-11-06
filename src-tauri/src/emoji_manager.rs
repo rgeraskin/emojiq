@@ -530,15 +530,16 @@ impl EmojiManager {
         Ok(emoji_keywords)
     }
 
-    /// Increment usage count for an emoji
-    pub fn increment_usage(&self, emoji: &str) -> Result<(), EmojiError> {
-        log::debug!("Incrementing usage for emoji: '{}'", emoji);
+    /// Increment usage count for an emoji by a specified amount (default: 1)
+    pub fn increment_usage(&self, emoji: &str, amount: Option<u32>) -> Result<(), EmojiError> {
+        let amount = amount.unwrap_or(1);
+        log::debug!("Incrementing usage for emoji: '{}' by {}", emoji, amount);
 
         // Ranks are already loaded at startup
         {
             let mut data = self.data.write().map_lock_err()?;
             let count = data.ranks.entry(emoji.to_string()).or_insert(0);
-            *count += 1;
+            *count += amount;
         }
 
         // Schedule batched write

@@ -103,8 +103,13 @@ async function handleEmojiClick(e) {
   if (e.target.classList.contains('emoji-button')) {
     const emoji = e.target.dataset.emoji || e.target.textContent;
 
+    // Check if Option key (altKey) is pressed
+    if (e.altKey) {
+      e.preventDefault();
+      await increaseEmojiRank10(emoji);
+    }
     // Check if Cmd key (metaKey) is pressed
-    if (e.metaKey) {
+    else if (e.metaKey) {
       e.preventDefault();
       await removeEmojiFromMostUsed(emoji);
     } else {
@@ -405,11 +410,28 @@ async function removeEmojiFromMostUsed(emoji) {
   try {
     await invoke("remove_emoji_rank", { emoji: emoji });
     updateStatus(`Removed ${emoji} from most used`);
+    // Clear search input
+    searchInput.value = '';
+    currentFilter = '';
     // Reload emojis to reflect the change
     await loadEmojis(currentFilter);
   } catch (error) {
     console.error('Error removing emoji from most used:', error);
     updateStatus('Error removing emoji o_0');
+  }
+}
+
+// Increase emoji rank by 10
+async function increaseEmojiRank10(emoji) {
+  console.log("increaseEmojiRank:", emoji);
+  try {
+    await invoke("increment_usage", { emoji: emoji, amount: 10 });
+    updateStatus(`Increased rank for ${emoji} by 10`);
+    // Reload emojis to reflect the change
+    await loadEmojis(currentFilter);
+  } catch (error) {
+    console.error('Error increasing emoji rank:', error);
+    updateStatus('Error increasing rank o_0');
   }
 }
 
