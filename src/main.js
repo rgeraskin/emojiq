@@ -24,6 +24,14 @@ const statusBar = document.getElementById('statusBar');
 let gridEmojis = [];
 let currentFilter = '';
 let previousElementIndex = 0;
+let isShiftPressed = false;
+let emojiBuffer = [];
+
+// Clear buffered multi-select state (Shift + emoji sequence)
+function clearBufferedState() {
+  emojiBuffer = [];
+  isShiftPressed = false;
+}
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', async function () {
@@ -34,9 +42,12 @@ document.addEventListener('DOMContentLoaded', async function () {
   setupEventListeners();
   setupWindowResizeHandler();
   setupSettingsListener();
+  setupVisibilityHandlers();
 });
 
 async function renderPanel() {
+  // Clear emoji buffer and shift state
+  clearBufferedState();
   // Load emojis
   await loadEmojis();
   // Clear search input
@@ -67,9 +78,21 @@ function setupEventListeners() {
   // Global shortcuts
   window.addEventListener('keydown', async function (e) {
     // console.log('Key pressed:', e.key);
+
+    // Track Shift key press
+    if (e.key === "Shift") {
+      isShiftPressed = true;
+      if (emojiBuffer.length === 0) {
+        updateStatus('Shift pressed: Click emojis to build sequence');
+      }
+      return;
+    }
+
     if (e.key === "Escape") {
       // console.log('ESC key detected, hiding panel');
       e.preventDefault();
+      // Clear emoji buffer if exists
+      clearBufferedState();
       await invoke("hide_panel");
       await renderPanel();
       return;
@@ -87,13 +110,42 @@ function setupEventListeners() {
     }
 
     // Focus search input when typing any character (but not special keys)
-    const isTypingCharacter = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
+    const isTypingCharacter = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
     const isSearchFocused = document.activeElement === searchInput;
 
     if (isTypingCharacter && !isSearchFocused) {
       // Focus search input and let the character be typed
       searchInput.focus();
       // Don't prevent default - let the character be typed in the search input
+    }
+  });
+
+  // Handle Shift key release
+  window.addEventListener('keyup', async function (e) {
+    if (e.key === "Shift") {
+      isShiftPressed = false;
+
+      // If we have buffered emojis, paste/copy them all
+      if (emojiBuffer.length > 0) {
+        const combinedEmojis = emojiBuffer.join('');
+        console.log('Shift released, processing buffered emojis:', combinedEmojis);
+
+        // Clear buffer first
+        const emojisToProcess = emojiBuffer.slice();
+        emojiBuffer = [];
+
+        // Process the combined emojis
+        await selectEmoji(combinedEmojis);
+
+        // Increment usage for each emoji in the sequence
+        for (const emoji of emojisToProcess) {
+          try {
+            await invoke("increment_usage", { emoji: emoji });
+          } catch (error) {
+            console.error('Error incrementing usage for emoji:', emoji, error);
+          }
+        }
+      }
     }
   });
 }
@@ -112,8 +164,16 @@ async function handleEmojiClick(e) {
     else if (e.metaKey) {
       e.preventDefault();
       await removeEmojiFromMostUsed(emoji);
+    }
+    // Check if Shift key is pressed - buffer the emoji
+    else if (e.shiftKey || isShiftPressed) {
+      e.preventDefault();
+      emojiBuffer.push(emoji);
+      console.log('Buffered emoji:', emoji, 'Total buffered:', emojiBuffer.length);
+      updateStatus(`Buffered: ${emojiBuffer.join('')} (${emojiBuffer.length} emoji${emojiBuffer.length !== 1 ? 's' : ''})`);
     } else {
-      selectEmoji(emoji);
+      await invoke("increment_usage", { emoji: emoji });
+      await selectEmoji(emoji);
     }
   }
 }
@@ -396,7 +456,6 @@ async function selectEmoji(emoji) {
   try {
     await invoke("hide_panel");
     await invoke("type_emoji", { emoji: emoji });
-    await invoke("increment_usage", { emoji: emoji });
   } catch (error) {
     console.error('Error selecting emoji:', error);
     updateStatus('Error pasting emoji o_0');
@@ -501,6 +560,38 @@ function setupWindowResizeHandler() {
       document.addEventListener('mouseup', handleMouseUp);
     });
   }
+}
+
+// Setup visibility/focus handlers to prevent buffered state leaks
+function setupVisibilityHandlers() {
+  // Clear when window loses focus
+  window.addEventListener('blur', () => {
+    clearBufferedState();
+  });
+
+  // Clear when document visibility changes (both hide and show)
+  document.addEventListener('visibilitychange', () => {
+    clearBufferedState();
+  });
+
+  // Also listen to Tauri window focus/blur if available
+  // Tauri focus/blur listeners were commented
+  // as window blur and visibilitychange suffice here
+  // try {
+  //   const { listen } = window.__TAURI__.event;
+  //   listen('tauri://blur', () => {
+  //     clearBufferedState();
+  //   }).catch(error => {
+  //     console.error('Failed to listen for tauri://blur:', error);
+  //   });
+  //   listen('tauri://focus', () => {
+  //     clearBufferedState();
+  //   }).catch(error => {
+  //     console.error('Failed to listen for tauri://focus:', error);
+  //   });
+  // } catch (error) {
+  //   console.error('Failed to attach Tauri visibility handlers:', error);
+  // }
 }
 
 // Apply scale factor from settings
