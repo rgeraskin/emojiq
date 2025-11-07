@@ -55,7 +55,7 @@ async function renderPanel() {
   // Focus search input
   searchInput.focus();
   // Update status bar
-  handleSearchMouseOver();
+  resetStatus();
 }
 
 // Setup event listeners with delegation
@@ -63,7 +63,7 @@ function setupEventListeners() {
   console.log('Setting up event listeners...');
 
   searchInput.addEventListener('input', handleSearch);
-  searchInput.addEventListener('mouseover', handleSearchMouseOver);
+  searchInput.addEventListener('mouseover', resetStatus);
   searchInput.addEventListener('keydown', handleSearchKeys);
   searchInput.addEventListener('click', async function (e) {
     e.preventDefault();
@@ -109,6 +109,16 @@ function setupEventListeners() {
       return;
     }
 
+    // Show status hints for modifier keys using modifier flags
+    if (e.metaKey) {
+      updateStatus('Cmd pressed: Click emoji to remove from most used');
+      return;
+    }
+    if (e.altKey) {
+      updateStatus('Option pressed: Click emoji to boost ranking +10');
+      return;
+    }
+
     // Focus search input when typing any character (but not special keys)
     const isTypingCharacter = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
     const isSearchFocused = document.activeElement === searchInput;
@@ -120,7 +130,7 @@ function setupEventListeners() {
     }
   });
 
-  // Handle Shift key release
+  // Handle modifier key releases
   window.addEventListener('keyup', async function (e) {
     if (e.key === "Shift") {
       isShiftPressed = false;
@@ -145,7 +155,20 @@ function setupEventListeners() {
             console.error('Error incrementing usage for emoji:', emoji, error);
           }
         }
+      } else {
+        // Reset status when Shift is released without buffered emojis
+        resetStatus();
       }
+    }
+
+    // Reset status on Cmd/Meta key release
+    if (e.key === "Meta") {
+      resetStatus();
+    }
+
+    // Reset status on Option/Alt key release
+    if (e.key === "Alt") {
+      resetStatus();
     }
   });
 }
@@ -313,7 +336,7 @@ async function handleSearch(e) {
   }, CONFIG.SEARCH_DEBOUNCE_MS);
 }
 
-function handleSearchMouseOver() {
+function resetStatus() {
   statusBar.className = 'status-bar-message';
   updateStatus('Click an emoji to paste it');
 }
