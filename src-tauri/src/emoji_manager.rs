@@ -57,6 +57,11 @@ pub struct EmojiManager {
     init_success: AtomicBool,
 }
 
+/// Remove the text/emoji presentation variation selector (U+FE0F) from a string
+fn strip_variation_selector(s: &str) -> String {
+    s.chars().filter(|&c| c != '\u{FE0F}').collect()
+}
+
 impl Default for EmojiManager {
     fn default() -> Self {
         let home_dir = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -476,7 +481,25 @@ impl EmojiManager {
         max_top_emojis: usize,
     ) -> Result<Vec<String>, EmojiError> {
         log::debug!("get_emojis called with filter: '{}'", filter_word);
-        let filter_word = filter_word.trim().to_lowercase();
+        let original = filter_word.trim();
+
+        // If the user entered an emoji glyph directly, return it immediately,
+        // bypassing the minimum search length gating.
+        // It's for a case when user wants to search the favorite emoji
+        // and boosts its usage count.
+        {
+            let data = self.data.read().map_lock_err()?;
+            if data.keywords.contains_key(original) {
+                return Ok(vec![original.to_string()]);
+            }
+            // Also try a VS16-stripped variant to handle presentation differences
+            let stripped = strip_variation_selector(original);
+            if stripped != original && data.keywords.contains_key(&stripped) {
+                return Ok(vec![stripped]);
+            }
+        }
+
+        let filter_word = original.to_lowercase();
 
         let emoji_list: Vec<String> = if filter_word.len() < MIN_SEARCH_LENGTH {
             log::debug!("Getting all emojis (filter too short)");

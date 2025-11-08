@@ -238,6 +238,45 @@ fn test_get_emojis_with_filter() {
 }
 
 #[test]
+fn test_get_emojis_with_glyph_direct_match() {
+    let temp_dir = TempDir::new().unwrap();
+    let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
+
+    let mut manager = EmojiManager::new(emoji_file, ranks_file.clone());
+    manager.ranks_file_path = ranks_file;
+
+    // Initialize the manager
+    manager.load_emojis().unwrap();
+    manager.load_ranks().unwrap();
+    manager.build_keywords().unwrap();
+    manager.build_index().unwrap();
+
+    // Direct glyph match should return the emoji immediately even though length < MIN_SEARCH_LENGTH
+    let result = manager.get_emojis("😀", 10).unwrap();
+    assert_eq!(result, vec!["😀".to_string()]);
+}
+
+#[test]
+fn test_get_emojis_with_glyph_vs16_stripped_match() {
+    let temp_dir = TempDir::new().unwrap();
+    let (emoji_file, ranks_file) = setup_test_files(&temp_dir);
+
+    let mut manager = EmojiManager::new(emoji_file, ranks_file.clone());
+    manager.ranks_file_path = ranks_file;
+
+    // Initialize the manager
+    manager.load_emojis().unwrap();
+    manager.load_ranks().unwrap();
+    manager.build_keywords().unwrap();
+    manager.build_index().unwrap();
+
+    // Append VS16 (U+FE0F) to an existing emoji and ensure it still matches
+    let calendar_vs16 = format!("{}\u{FE0F}", "📆");
+    let result = manager.get_emojis(&calendar_vs16, 10).unwrap();
+    assert_eq!(result, vec!["📆".to_string()]);
+}
+
+#[test]
 fn test_get_keywords() {
     let temp_dir = TempDir::new().unwrap();
     let (emoji_file, _) = setup_test_files(&temp_dir);
