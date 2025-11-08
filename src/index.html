@@ -12,7 +12,10 @@
 <body>
   <main class="container">
     <div data-tauri-drag-region class="search-container">
-      <input type="text" id="searchInput" class="search-input" placeholder="Search emojis..." autocomplete="off" />
+      <div class="search-input-wrapper">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search emojis..." autocomplete="off" />
+        <button id="helpIcon" class="help-icon" aria-label="Show help" title="Help">?</button>
+      </div>
     </div>
 
     <div class="emoji-grid" id="emojiGrid">

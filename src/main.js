@@ -19,6 +19,7 @@ const requestIdleCallback = window.requestIdleCallback || function (callback) {
 const searchInput = document.getElementById('searchInput');
 const emojiGrid = document.getElementById('emojiGrid');
 const statusBar = document.getElementById('statusBar');
+const helpIcon = document.getElementById('helpIcon');
 
 // Global variables
 let gridEmojis = [];
@@ -43,6 +44,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   setupWindowResizeHandler();
   setupSettingsListener();
   setupVisibilityHandlers();
+
+  // Initialize help UI
+  setupHelpTooltip();
 });
 
 async function renderPanel() {
@@ -171,6 +175,30 @@ function setupEventListeners() {
       resetStatus();
     }
   });
+}
+
+// Setup help button to open Help window
+function setupHelpTooltip() {
+  try {
+    if (searchInput) {
+      searchInput.classList.add('has-help');
+    }
+    if (!helpIcon) {
+      return;
+    }
+
+    // Open separate Help window on click
+    helpIcon.addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        await invoke("open_help");
+      } catch (err) {
+        console.error('Failed to open help window:', err);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to setup help button:', error);
+  }
 }
 
 // Event delegation handlers

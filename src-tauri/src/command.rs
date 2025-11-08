@@ -209,6 +209,32 @@ pub fn open_settings(handle: AppHandle, state: State<'_, AppState>) -> Result<()
 }
 
 #[tauri::command]
+pub fn open_help(handle: AppHandle, state: State<'_, AppState>) -> Result<(), EmojiError> {
+    // Signal that we're opening help to prevent focus restoration to previous app
+    state
+        .opening_help
+        .store(true, std::sync::atomic::Ordering::Release);
+
+    let result = tray::open_help_window(&handle).map_err(|e| EmojiError::Tauri(e.to_string()));
+
+    // Clear the flag after attempting to open help
+    state
+        .opening_help
+        .store(false, std::sync::atomic::Ordering::Release);
+
+    result
+}
+
+#[tauri::command]
+pub fn close_help(handle: AppHandle) -> Result<(), EmojiError> {
+    if let Some(win) = handle.get_webview_window("help") {
+        win.close()
+            .map_err(|e| EmojiError::Tauri(e.to_string()))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn save_window_size(state: State<AppState>, width: f64, height: f64) -> Result<(), EmojiError> {
     state.settings_manager.update_window_size(width, height)
 }

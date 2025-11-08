@@ -25,6 +25,7 @@ pub struct AppState {
     pub emoji_manager: Arc<EmojiManager>,
     pub settings_manager: Arc<SettingsManager>,
     pub opening_settings: Arc<AtomicBool>,
+    pub opening_help: Arc<AtomicBool>,
     pub current_shortcut: Arc<Mutex<Shortcut>>,
     pub shortcut_pressed: Arc<AtomicBool>,
 }
@@ -104,6 +105,8 @@ pub fn run() {
             command::open_settings,
             command::save_window_size,
             command::reregister_hotkey,
+            command::open_help,
+            command::close_help,
         ])
         .setup(move |app| {
             // Set activation policy to Accessory to prevent the app icon from showing on the dock
@@ -134,6 +137,9 @@ pub fn run() {
                 dir
             };
 
+            // Determine if this is the first launch (settings file absent)
+            let first_launch = !settings_file_path.exists();
+
             let settings_manager = Arc::new(SettingsManager::new(settings_file_path));
             if let Err(e) = settings_manager.initialize() {
                 log::warn!("Failed to initialize settings manager: {}", e);
@@ -161,6 +167,7 @@ pub fn run() {
                 emoji_manager,
                 settings_manager,
                 opening_settings: Arc::new(AtomicBool::new(false)),
+                opening_help: Arc::new(AtomicBool::new(false)),
                 current_shortcut: Arc::new(Mutex::new(shortcut.clone())),
                 shortcut_pressed: Arc::new(AtomicBool::new(false)),
             };
@@ -174,6 +181,13 @@ pub fn run() {
             // Register initial global shortcut (single central handler already set by plugin)
             if let Err(e) = app_handle.global_shortcut().register(shortcut.clone()) {
                 log::error!("Failed to register initial hotkey: {}", e);
+            }
+
+            // Show Help window on first launch
+            if first_launch {
+                if let Err(e) = tray::open_help_window(&app_handle) {
+                    log::error!("Failed to open Help window on first launch: {}", e);
+                }
             }
 
             // After settings manager has loaded, re-register to saved hotkey if different

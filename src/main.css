@@ -137,6 +137,40 @@ body {
   white-space: pre-wrap;
 }
 
+/* Search input wrapper and help icon/tooltip */
+.search-input-wrapper {
+  position: relative;
+}
+
+/* When help icon is present, add right padding to avoid overlap */
+.search-input.has-help {
+  padding-right: calc(34px * var(--scale-factor));
+}
+
+.help-icon {
+  position: absolute;
+  top: 50%;
+  right: calc(12px * var(--scale-factor));
+  transform: translateY(-50%);
+  width: calc(20px * var(--scale-factor));
+  height: calc(20px * var(--scale-factor));
+  border-radius: 50%;
+  border: 1px solid #d0d0d0;
+  background: #ffffff;
+  color: #555;
+  font-weight: 600;
+  font-size: calc(12px * var(--scale-factor));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.help-icon:hover {
+  background: #f2f2f2;
+}
+
 /* Scrollbar styling */
 .emoji-grid::-webkit-scrollbar {
   width: calc(8px * var(--scale-factor));

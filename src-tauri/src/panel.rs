@@ -21,6 +21,17 @@ fn try_focus_settings(handle: &AppHandle) -> bool {
     false
 }
 
+/// Helper function to check if help window is visible and focus it if so
+/// Returns true if help was visible and focused
+fn try_focus_help(handle: &AppHandle) -> bool {
+    if let Some(window) = handle.get_webview_window("help") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.set_focus();
+            return true;
+        }
+    }
+    false
+}
 // Define custom panel class and event handler
 tauri_panel! {
     panel!(EmojiqPanel {
@@ -94,18 +105,21 @@ pub fn init(app_handle: &AppHandle) -> tauri::Result<()> {
         // Restore nonactivating_panel for fullscreen compatibility
         panel_for_handler.set_style_mask(StyleMask::empty().nonactivating_panel().into());
 
-        // Check if we're opening settings - if so, don't restore focus yet
+        // Check if we're opening settings or help - if so, don't restore focus yet
         if let Some(state) = handle_for_handler.try_state::<crate::AppState>() {
-            if state
+            let opening_settings = state
                 .opening_settings
-                .load(std::sync::atomic::Ordering::Acquire)
-            {
+                .load(std::sync::atomic::Ordering::Acquire);
+            let opening_help = state
+                .opening_help
+                .load(std::sync::atomic::Ordering::Acquire);
+            if opening_settings || opening_help {
                 return;
             }
         }
 
-        // Try to focus settings window if it's open, otherwise restore previous app
-        if !try_focus_settings(&handle_for_handler) {
+        // Try to focus settings window, then help window; otherwise restore previous app
+        if !try_focus_settings(&handle_for_handler) && !try_focus_help(&handle_for_handler) {
             restore_previous_app();
         }
     });

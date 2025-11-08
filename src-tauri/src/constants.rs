@@ -31,7 +31,11 @@ pub const DEFAULT_SCALE_FACTOR: f64 = 1.0;
 
 // Settings window dimensions
 pub const SETTINGS_WINDOW_WIDTH: f64 = 400.0;
-pub const SETTINGS_WINDOW_HEIGHT: f64 = 755.0;
+pub const SETTINGS_WINDOW_HEIGHT: f64 = 760.0;
+
+// Help window dimensions
+pub const HELP_WINDOW_WIDTH: f64 = 520.0;
+pub const HELP_WINDOW_HEIGHT: f64 = 560.0;
 
 pub const MIN_SCALE_FACTOR: f64 = 0.5;
 pub const MAX_SCALE_FACTOR: f64 = 2.0;

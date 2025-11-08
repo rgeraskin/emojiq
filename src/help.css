@@ -1,0 +1,107 @@
+:root {
+    --scale-factor: 1.0;
+}
+
+*,
+*:before,
+*:after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+    color: #333;
+    background: #fff;
+    overflow: hidden;
+    /* disable scrollbars */
+}
+
+.help-container {
+    padding: calc(30px * var(--scale-factor));
+    padding-top: calc(15px * var(--scale-factor));
+    max-width: calc(560px * var(--scale-factor));
+}
+
+.title {
+    margin: 0 0 calc(12px * var(--scale-factor));
+    font-size: calc(18px * var(--scale-factor));
+}
+
+.welcome-title {
+    margin: 0 0 calc(8px * var(--scale-factor));
+    font-size: calc(20px * var(--scale-factor));
+    text-align: center;
+}
+
+.section {
+    margin-bottom: calc(12px * var(--scale-factor));
+}
+
+.section h2 {
+    margin: 0 0 calc(8px * var(--scale-factor));
+    font-size: calc(12px * var(--scale-factor));
+    color: #555;
+}
+
+ul {
+    margin: 0;
+    padding: 0 0 0 calc(16px * var(--scale-factor));
+    list-style: none;
+}
+
+li {
+    margin: 0 0 calc(6px * var(--scale-factor));
+    line-height: 1.4;
+    font-size: calc(14px * var(--scale-factor));
+}
+
+.k {
+    display: inline-block;
+    padding: 0 calc(6px * var(--scale-factor));
+    border: 1px solid #ddd;
+    border-bottom-width: 2px;
+    border-radius: calc(6px * var(--scale-factor));
+    background: #f9f9f9;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.95em;
+    margin-right: calc(4px * var(--scale-factor));
+}
+
+.actions {
+    margin-top: calc(16px * var(--scale-factor));
+    display: flex;
+    justify-content: center;
+}
+
+.primary-btn {
+    padding: calc(8px * var(--scale-factor)) calc(14px * var(--scale-factor));
+    border-radius: calc(8px * var(--scale-factor));
+    border: 1px solid #007aff;
+    background: #007aff;
+    color: #fff;
+    font-weight: 600;
+    font-size: calc(16px * var(--scale-factor));
+    cursor: pointer;
+}
+
+.primary-btn:hover {
+    filter: brightness(0.95);
+}
+
+.primary-btn:active {
+    filter: brightness(0.9);
+}
+
+/* Hide overlay scrollbars in WebKit if any */
+body::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+/* Hide scrollbars in Firefox */
+body {
+    scrollbar-width: none;
+}
