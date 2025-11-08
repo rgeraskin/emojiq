@@ -14,7 +14,7 @@ Inspired by the excellent [qmoji](https://github.com/jaredly/qmoji) by Jared For
 
 - 🚀 **Instant access**: Open with customizable global hotkey (default: `Cmd+Option+Space`)
 - 🔥 **Favorite emojis**: Configurable number of most-used emojis appear first for quick access (default: 10)
-- 🔍 **Fast search**: Find emojis by name, description, or keywords
+- 🔍 **Fast search**: Find emojis by name, description, keywords, or by pasting an emoji glyph
 - ⌨️ **Keyboard navigation**: Navigate with arrow keys; select with Enter/Space
 - 📋 **Auto-paste**: Selected emojis are automatically pasted into your active application. Or copied to clipboard. Or both 🙂
 - 🎯 **Smart positioning**: Optional panel positioning under mouse cursor
@@ -35,23 +35,33 @@ brew install --cask emojiq
 
 For paste modes, on first use, click "Open System Settings" in the dialog and enable "EmojiQ" in the list. You can grant or revoke this permission anytime in System Settings → Privacy & Security → Accessibility.
 
+**Update note**: After updating the app, you will need to re‑grant the Accessibility permission. When prompted, open System Settings. If it appears already granted, remove EmojiQ from the list. On the next permission prompt, the app will reappear in the list and you can grant it again.
+
 ## Usage
 
 1. **Open the picker**: Press Cmd+Option+Space (or your custom hotkey)
-1. **Search**: Type to filter emojis by name or keywords
+1. **Search**: Type to filter by name, keywords, or paste an emoji glyph to jump to it
 1. **Navigate**: Use arrow keys to move between emojis
 1. **Hover**: Hover over an emoji to see its name and keywords
 1. **Select**: Click an emoji or press Enter/Space to paste/copy it
+1. **Multi-select**: Hold Shift and click multiple emojis to build a sequence; release Shift to paste
+1. **Boost rank**: Option+Click an emoji to increase its rank by 10 without pasting
 1. **Remove from favorites**: Cmd+Click an emoji to remove it from most used
 1. **Settings**: Click the tray icon and select "Settings" or press Cmd+, in the main panel
+1. **Help**: Click the “?” icon next to search or use tray → Help to view shortcuts
 1. **Close**: Press Escape or click outside the panel
 
 ### Keyboard Shortcuts
 
+Click the “?” icon next to search or use tray → Help to view shortcuts.
+
 - Cmd+Option+Space: Open/close the emoji panel (customizable)
 - ↑ ↓ ← →: Navigate between emojis
 - Enter or Space: Select emoji
+- Enter (in search): Paste first emoji
 - Cmd+Click: Remove emoji from most used list
+- Option+Click: Boost emoji rank by +10
+- Shift+Click: Build a multi-emoji sequence; release Shift to paste
 - Cmd+,: Open settings (from main panel)
 - Escape: Close the panel
 - Home/End: Jump to first/last emoji
@@ -64,6 +74,9 @@ It’s like qmoji, but with:
 - better focus management
 - toggle the app with the same hotkey
 - clear favorites logic: the more you use an emoji, the higher it appears
+- resizeable window
+- settings: global hotkey, placement, most used emojis count, UI scale factor, emoji selection mode, reset emoji ranks, clipboard support
+- boost rank / remove from favorites with modifier keys, multi-select with Shift key
 - more emojis and more keywords
 - cross-platform by design (macOS supported today)
 - MIT licensed
@@ -129,32 +142,6 @@ See tauri prerequisites [here](https://tauri.app/start/prerequisites/): Node.js,
    ```bash
    pnpm tauri build
    ```
-
-### Project Structure
-
-```
-emojiq/
-├── src/                    # Frontend (HTML/CSS/JS)
-│   ├── index.html
-│   ├── main.js
-│   ├── main.css
-│   ├── settings.html
-│   ├── settings.js
-│   └── settings.css
-├── src-tauri/              # Backend (Rust)
-│   ├── src/
-│   │   ├── main.rs
-│   │   ├── lib.rs
-│   │   ├── emoji_manager.rs
-│   │   ├── panel.rs
-│   │   ├── tray.rs
-│   │   ├── settings.rs
-│   │   ├── hotkey.rs
-│   │   └── ...
-│   ├── Cargo.toml
-│   └── tauri.conf.json
-└── package.json
-```
 
 ### Contributing
 
