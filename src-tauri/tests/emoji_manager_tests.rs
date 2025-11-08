@@ -280,7 +280,7 @@ fn test_increment_usage() {
     };
 
     // Increment usage
-    manager.increment_usage("😀").unwrap();
+    manager.increment_usage("😀", None).unwrap();
 
     // Check that count was incremented
     let new_count = {
@@ -301,7 +301,7 @@ fn test_increment_usage_new_emoji() {
     let manager = EmojiManager::new(PathBuf::from("nonexistent.json"), ranks_file);
 
     // Increment usage for emoji not in ranks
-    manager.increment_usage("🚀").unwrap();
+    manager.increment_usage("🚀", None).unwrap();
 
     // Should start at 1
     let count = {
@@ -331,7 +331,7 @@ fn test_public_api_functions() {
     // Test the public API functions with the manager instance (using new direct method calls)
     let _result = manager.get_emojis("", 10);
     let _result = manager.get_keywords("😀");
-    let _result = manager.increment_usage("😀");
+    let _result = manager.increment_usage("😀", None);
 
     // Just test that the functions can be called without panicking
     assert!(true);
